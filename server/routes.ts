@@ -1,0 +1,270 @@
+import type { Express } from "express";
+import { createServer, type Server } from "http";
+import Stripe from "stripe";
+import { storage } from "./storage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
+import { generateChatResponse, generateConversationTitle } from "./gemini";
+import { insertMessageSchema, insertConversationSchema } from "@shared/schema";
+import { z } from "zod";
+
+// Stripe will be configured later
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2025-07-30.basil",
+  });
+}
+
+// Rate limits by subscription tier
+const RATE_LIMITS = {
+  free: 10,
+  ultra: 500,
+  pro: -1, // unlimited
+};
+
+export async function registerRoutes(app: Express): Promise<Server> {
+  // Auth middleware
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Chat routes
+  app.post('/api/chat', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check rate limits
+      const limit = RATE_LIMITS[user.subscriptionTier as keyof typeof RATE_LIMITS] || RATE_LIMITS.free;
+      if (limit > 0 && (user.dailyMessageCount || 0) >= limit) {
+        return res.status(429).json({ 
+          message: "Daily message limit reached. Please upgrade your subscription for more messages.",
+          limit,
+          used: user.dailyMessageCount || 0
+        });
+      }
+
+      const { message, conversationId } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      let conversation;
+      let conversationHistory: Array<{ role: string; content: string }> = [];
+
+      if (conversationId) {
+        conversation = await storage.getConversation(conversationId);
+        if (!conversation || conversation.userId !== userId) {
+          return res.status(404).json({ message: "Conversation not found" });
+        }
+        
+        // Get conversation history
+        const messages = await storage.getConversationMessages(conversationId);
+        conversationHistory = messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+      } else {
+        // Create new conversation
+        const title = await generateConversationTitle(message);
+        conversation = await storage.createConversation({
+          userId,
+          title
+        });
+      }
+
+      // Save user message
+      await storage.createMessage({
+        conversationId: conversation.id,
+        role: "user",
+        content: message
+      });
+
+      // Determine AI model based on subscription
+      const aiModel = user.subscriptionTier === 'pro' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+
+      // Generate AI response
+      const aiResponse = await generateChatResponse(message, conversationHistory, aiModel);
+
+      // Save AI response
+      const aiMessage = await storage.createMessage({
+        conversationId: conversation.id,
+        role: "assistant",
+        content: aiResponse.content,
+        aiModel: aiResponse.model
+      });
+
+      // Increment user's daily message count
+      await storage.incrementDailyMessageCount(userId);
+
+      res.json({
+        conversationId: conversation.id,
+        message: aiMessage,
+        remaining: limit > 0 ? Math.max(0, limit - (user.dailyMessageCount || 0) - 1) : -1
+      });
+
+    } catch (error) {
+      console.error("Chat error:", error);
+      res.status(500).json({ message: "Failed to process chat message" });
+    }
+  });
+
+  // Conversation routes
+  app.get('/api/conversations', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversations = await storage.getUserConversations(userId);
+      res.json(conversations);
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      res.status(500).json({ message: "Failed to fetch conversations" });
+    }
+  });
+
+  app.get('/api/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversationId = req.params.id;
+      
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation || conversation.userId !== userId) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      const messages = await storage.getConversationMessages(conversationId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching messages:", error);
+      res.status(500).json({ message: "Failed to fetch messages" });
+    }
+  });
+
+  // Subscription routes (disabled until Stripe is configured)
+  app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
+    if (!stripe) {
+      return res.status(503).json({ 
+        message: "Payment processing is not yet configured. Please try again later." 
+      });
+    }
+
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { priceId, tier } = req.body;
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.email) {
+        return res.status(400).json({ message: "User email is required for subscription" });
+      }
+
+      // Check if user already has an active subscription
+      if (user.stripeSubscriptionId) {
+        const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
+        if (subscription.status === 'active') {
+          const invoice = subscription.latest_invoice;
+          const paymentIntent = typeof invoice === 'object' && invoice ? invoice.payment_intent : null;
+          const clientSecret = typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null;
+          
+          return res.json({
+            subscriptionId: subscription.id,
+            clientSecret,
+          });
+        }
+      }
+
+      let customerId = user.stripeCustomerId;
+
+      // Create customer if doesn't exist
+      if (!customerId) {
+        const customer = await stripe.customers.create({
+          email: user.email,
+          name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        });
+        customerId = customer.id;
+      }
+
+      // Create subscription
+      const subscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: priceId }],
+        payment_behavior: 'default_incomplete',
+        expand: ['latest_invoice.payment_intent'],
+        currency: 'chf',
+      });
+
+      // Update user with Stripe info
+      await storage.updateUserSubscription(
+        userId,
+        tier,
+        customerId,
+        subscription.id
+      );
+
+      const invoice = subscription.latest_invoice;
+      const paymentIntent = typeof invoice === 'object' && invoice ? invoice.payment_intent : null;
+      const clientSecret = typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null;
+
+      res.json({
+        subscriptionId: subscription.id,
+        clientSecret,
+      });
+
+    } catch (error: any) {
+      console.error("Subscription creation error:", error);
+      res.status(500).json({ message: "Failed to create subscription: " + error.message });
+    }
+  });
+
+  // Stripe webhook to handle successful payments
+  app.post('/api/stripe/webhook', async (req, res) => {
+    if (!stripe) {
+      return res.status(503).json({ message: "Webhook processing not configured" });
+    }
+
+    const sig = req.headers['stripe-signature'];
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(req.body, sig!, process.env.STRIPE_WEBHOOK_SECRET!);
+    } catch (err: any) {
+      console.error(`Webhook signature verification failed:`, err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'invoice.payment_succeeded') {
+      const invoice = event.data.object as any;
+      const subscriptionId = invoice.subscription;
+      
+      try {
+        const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+        // Find user by customer ID and update subscription status
+        // Note: You might need to add a method to find user by stripe customer ID
+      } catch (error) {
+        console.error("Error processing webhook:", error);
+      }
+    }
+
+    res.json({ received: true });
+  });
+
+  const httpServer = createServer(app);
+  return httpServer;
+}

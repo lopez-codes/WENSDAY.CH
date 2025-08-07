@@ -1,10 +1,10 @@
 import { GoogleGenAI } from "@google/genai";
 
-if (!process.env.GEMINI_API_KEY) {
-  console.warn("GEMINI_API_KEY not found - AI chat will not work until configured");
+if (!process.env.GOOGLE_API_KEY) {
+  console.warn("GOOGLE_API_KEY not found - AI chat will not work until configured");
 }
 
-const ai = process.env.GEMINI_API_KEY ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }) : null;
+const ai = process.env.GOOGLE_API_KEY ? new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY }) : null;
 
 export interface ChatResponse {
   content: string;
@@ -17,7 +17,7 @@ export async function generateChatResponse(
   model: string = "gemini-2.5-flash"
 ): Promise<ChatResponse> {
   if (!ai) {
-    throw new Error("AI service not configured. Please add your GEMINI_API_KEY to enable chat functionality.");
+    throw new Error("AI service not configured. Please add your GOOGLE_API_KEY to enable chat functionality.");
   }
 
   try {

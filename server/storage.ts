@@ -115,6 +115,32 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  // Update user subscription info (supports both Stripe and PostFinance)
+  async updateUserSubscription(
+    userId: string,
+    subscriptionTier: string,
+    options: {
+      stripeCustomerId?: string;
+      stripeSubscriptionId?: string;
+      postfinanceSubscriptionId?: number;
+      postfinanceTransactionId?: number;
+      paymentMethod?: 'stripe' | 'postfinance';
+    } = {}
+  ): Promise<User> {
+    const updateData: any = {
+      subscriptionTier,
+      updatedAt: new Date(),
+      ...options
+    };
+
+    const [user] = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
   // Conversation operations
   async createConversation(conversation: InsertConversation): Promise<Conversation> {
     const [newConversation] = await db

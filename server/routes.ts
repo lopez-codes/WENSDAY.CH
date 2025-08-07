@@ -4,8 +4,16 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { generateChatResponse, generateConversationTitle } from "./gemini";
-import { insertMessageSchema, insertConversationSchema } from "@shared/schema";
+import { insertMessageSchema, insertConversationSchema, users } from "@shared/schema";
 import { z } from "zod";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import { 
+  postfinanceClient, 
+  POSTFINANCE_PRODUCTS, 
+  validatePostFinanceWebhook,
+  createSubscriptionLineItem
+} from "./postfinance";
 
 // Stripe will be configured later
 let stripe: Stripe | null = null;
@@ -263,6 +271,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     res.json({ received: true });
+  });
+
+  // PostFinance Checkout Routes
+  app.post('/api/postfinance/create-subscription', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { tier } = req.body; // 'ultra' or 'pro'
+
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      if (!user.email) {
+        return res.status(400).json({ message: "User email is required for subscription" });
+      }
+
+      if (!tier || !['ultra', 'pro'].includes(tier)) {
+        return res.status(400).json({ message: "Invalid subscription tier" });
+      }
+
+      const product = POSTFINANCE_PRODUCTS[tier as 'ultra' | 'pro'];
+      const baseUrl = req.get('host')?.includes('localhost') 
+        ? 'http://localhost:5000' 
+        : `https://${req.get('host')}`;
+
+      // Create PostFinance transaction for subscription
+      const transaction = await postfinanceClient.createTransaction({
+        amount: product.price,
+        currency: product.currency,
+        lineItems: [createSubscriptionLineItem(tier as 'ultra' | 'pro')],
+        billingAddress: {
+          givenName: user.firstName || undefined,
+          familyName: user.lastName || undefined,
+          emailAddress: user.email,
+        },
+        successUrl: `${baseUrl}/subscription-success?tier=${tier}`,
+        failureUrl: `${baseUrl}/subscription-failed`,
+      });
+
+      // Update user with PostFinance transaction info
+      await storage.updateUserSubscription(userId, tier, {
+        postfinanceTransactionId: transaction.id,
+        paymentMethod: 'postfinance'
+      });
+
+      res.json({
+        transactionId: transaction.id,
+        paymentUrl: `https://checkout.postfinance.ch/pay/${transaction.id}`,
+        amount: product.price,
+        currency: product.currency
+      });
+
+    } catch (error: any) {
+      console.error("PostFinance subscription creation error:", error);
+      res.status(500).json({ message: "Failed to create PostFinance subscription: " + error.message });
+    }
+  });
+
+  // PostFinance webhook to handle payment notifications
+  app.post('/api/postfinance/webhook', async (req, res) => {
+    try {
+      const body = JSON.stringify(req.body);
+      const signature = req.headers['x-signature'] as string;
+
+      if (!validatePostFinanceWebhook(body, signature)) {
+        console.error("Invalid PostFinance webhook signature");
+        return res.status(400).json({ message: "Invalid signature" });
+      }
+
+      const event = req.body;
+      console.log("PostFinance webhook event:", event.listenerEntityTechnicalName, event.state);
+
+      if (event.listenerEntityTechnicalName === 'Transaction' && event.state === 'AUTHORIZED') {
+        const transactionId = event.entityId;
+        
+        // Find user by transaction ID and activate subscription
+        const user = await db
+          .select()
+          .from(users)
+          .where(eq(users.postfinanceTransactionId, transactionId))
+          .limit(1);
+
+        if (user.length > 0) {
+          const userData = user[0];
+          console.log(`Activating subscription for user ${userData.id} with transaction ${transactionId}`);
+          
+          // Activate the subscription based on transaction amount
+          // This is a simplified version - in production you'd want to verify the transaction details
+          await storage.updateUserSubscription(userData.id, userData.subscriptionTier, {
+            paymentMethod: 'postfinance'
+          });
+        }
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error("PostFinance webhook error:", error);
+      res.status(500).json({ message: "Webhook processing failed" });
+    }
   });
 
   const httpServer = createServer(app);

@@ -33,6 +33,9 @@ export const users = pgTable("users", {
   subscriptionTier: varchar("subscription_tier").default("free"), // free, ultra, pro
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
+  postfinanceSubscriptionId: integer("postfinance_subscription_id"),
+  postfinanceTransactionId: integer("postfinance_transaction_id"),
+  paymentMethod: varchar("payment_method").default("stripe"), // stripe, postfinance
   dailyMessageCount: integer("daily_message_count").default(0),
   lastMessageDate: timestamp("last_message_date"),
   createdAt: timestamp("created_at").defaultNow(),

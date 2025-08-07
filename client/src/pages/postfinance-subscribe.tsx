@@ -66,11 +66,21 @@ export default function PostFinanceSubscribe() {
       }
     } catch (error: any) {
       console.error('PostFinance subscription error:', error);
-      toast({
-        title: "Fehler bei der Zahlung",
-        description: error.message || "Die PostFinance-Zahlung konnte nicht initialisiert werden.",
-        variant: "destructive",
-      });
+      
+      // Check if PostFinance is not configured
+      if (error.message?.includes('not configured')) {
+        toast({
+          title: "PostFinance noch nicht aktiviert",
+          description: "PostFinance Checkout wird bald verfügbar sein. Verwenden Sie bis dahin andere Zahlungsarten.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Fehler bei der Zahlung",
+          description: error.message || "Die PostFinance-Zahlung konnte nicht initialisiert werden.",
+          variant: "destructive",
+        });
+      }
     } finally {
       setIsLoading(null);
     }

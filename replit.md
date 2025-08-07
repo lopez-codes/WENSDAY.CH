@@ -11,6 +11,7 @@ This is a Swiss AI chat platform called "wensday.ch" that provides professional 
 - Implemented chat interface with demo functionality
 - Prepared Stripe integration (awaiting API keys from user)
 - **COMPLETED**: Configured GOOGLE_API_KEY for Gemini AI integration - chat functionality now fully operational
+- **PREPARED**: PostFinance Checkout integration ready for Swiss payment processing (awaiting API keys from user for production deployment)
 
 # User Preferences
 

@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { generateChatResponse, generateConversationTitle } from "./gemini";
+import { aiProviderManager } from "./ai-providers";
 import { insertMessageSchema, insertConversationSchema, users } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -88,11 +88,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           content: msg.content
         }));
       } else {
-        // Create new conversation
-        const title = await generateConversationTitle(message);
+        // Create new conversation with temporary title
         conversation = await storage.createConversation({
           userId,
-          title
+          title: message.substring(0, 50) + (message.length > 50 ? '...' : '')
         });
       }
 
@@ -103,18 +102,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: message
       });
 
-      // Determine AI model based on subscription
-      const aiModel = user.subscriptionTier === 'pro' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+      // Get requested model from request body, with defaults based on subscription
+      const { selectedModel } = req.body;
+      let aiModel: string;
+      
+      if (selectedModel) {
+        // Verify user has access to this model
+        const availableModels = aiProviderManager.getAllModels();
+        const requestedModel = availableModels.find(m => m.id === selectedModel);
+        
+        if (!requestedModel) {
+          return res.status(400).json({ message: "Invalid AI model selected" });
+        }
+        
+        // Check if user has access based on subscription and model pricing
+        if (requestedModel.pricing === 'paid' && user.subscriptionTier === 'free') {
+          return res.status(403).json({ 
+            message: "Upgrade your subscription to access premium AI models",
+            requiredTier: 'ultra'
+          });
+        }
+        
+        aiModel = selectedModel;
+      } else {
+        // Default model selection based on subscription
+        if (user.subscriptionTier === 'pro') {
+          aiModel = 'gemini-2.5-pro';
+        } else if (user.subscriptionTier === 'ultra') {
+          aiModel = 'gemini-2.5-flash';
+        } else {
+          // Free users get access to free models only
+          const freeModels = aiProviderManager.getFreeModels();
+          aiModel = freeModels.length > 0 ? freeModels[0].id : 'deepseek/deepseek-r1:free';
+        }
+      }
 
-      // Generate AI response
-      const aiResponse = await generateChatResponse(message, conversationHistory, aiModel);
+      // Generate conversation title for new conversations using AI
+      if (!conversationId) {
+        try {
+          const titleResponse = await aiProviderManager.generateResponse(
+            aiModel,
+            [{ role: 'user', content: `Generate a short, descriptive title (max 6 words) for this conversation in German: "${message}"` }],
+            { maxTokens: 50 }
+          );
+          conversation.title = titleResponse.trim().replace(/"/g, '');
+        } catch (error) {
+          console.warn('Failed to generate conversation title:', error);
+          conversation.title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
+        }
+      }
+
+      // Generate AI response using the provider manager
+      const chatMessages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
+        ...conversationHistory.map(msg => ({
+          role: msg.role as 'user' | 'assistant' | 'system',
+          content: msg.content
+        })),
+        { role: 'user' as const, content: message }
+      ];
+      
+      const aiResponse = await aiProviderManager.generateResponse(
+        aiModel,
+        chatMessages,
+        {
+          maxTokens: user.subscriptionTier === 'pro' ? 8192 : 4096,
+          temperature: 0.7
+        }
+      );
 
       // Save AI response
       const aiMessage = await storage.createMessage({
         conversationId: conversation.id,
         role: "assistant",
-        content: aiResponse.content,
-        aiModel: aiResponse.model
+        content: aiResponse,
+        aiModel: aiModel
       });
 
       // Increment user's daily message count
@@ -129,6 +190,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Chat error:", error);
       res.status(500).json({ message: "Failed to process chat message" });
+    }
+  });
+
+  // AI Models route - get available models based on user subscription
+  app.get('/api/ai-models', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const allModels = aiProviderManager.getAllModels();
+      const availableProviders = aiProviderManager.getAvailableProviders();
+      
+      // Filter models based on subscription tier
+      let userModels;
+      if (user.subscriptionTier === 'pro') {
+        // Pro users get all available models
+        userModels = allModels;
+      } else if (user.subscriptionTier === 'ultra') {
+        // Ultra users get free and freemium models
+        userModels = allModels.filter(model => model.pricing !== 'paid' || model.provider === 'google');
+      } else {
+        // Free users get only free models
+        userModels = allModels.filter(model => model.pricing === 'free');
+      }
+
+      res.json({
+        models: userModels,
+        providers: availableProviders.map(p => ({ name: p.name, isAvailable: p.isAvailable() })),
+        userTier: user.subscriptionTier
+      });
+    } catch (error) {
+      console.error("Error fetching AI models:", error);
+      res.status(500).json({ message: "Failed to fetch AI models" });
     }
   });
 
@@ -188,8 +286,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const subscription = await stripe.subscriptions.retrieve(user.stripeSubscriptionId);
         if (subscription.status === 'active') {
           const invoice = subscription.latest_invoice;
-          const paymentIntent = typeof invoice === 'object' && invoice ? invoice.payment_intent : null;
-          const clientSecret = typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null;
+          const paymentIntent = typeof invoice === 'object' && invoice ? (invoice as any).payment_intent : null;
+          const clientSecret = typeof paymentIntent === 'object' && paymentIntent ? (paymentIntent as any).client_secret : null;
           
           return res.json({
             subscriptionId: subscription.id,
@@ -222,13 +320,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateUserSubscription(
         userId,
         tier,
-        customerId,
-        subscription.id
+        {
+          stripeCustomerId: customerId,
+          stripeSubscriptionId: subscription.id
+        }
       );
 
       const invoice = subscription.latest_invoice;
-      const paymentIntent = typeof invoice === 'object' && invoice ? invoice.payment_intent : null;
-      const clientSecret = typeof paymentIntent === 'object' && paymentIntent ? paymentIntent.client_secret : null;
+      const paymentIntent = typeof invoice === 'object' && invoice ? (invoice as any).payment_intent : null;
+      const clientSecret = typeof paymentIntent === 'object' && paymentIntent ? (paymentIntent as any).client_secret : null;
 
       res.json({
         subscriptionId: subscription.id,
@@ -360,7 +460,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // Activate the subscription based on transaction amount
           // This is a simplified version - in production you'd want to verify the transaction details
-          await storage.updateUserSubscription(userData.id, userData.subscriptionTier, {
+          await storage.updateUserSubscription(userData.id, userData.subscriptionTier || 'ultra', {
             paymentMethod: 'postfinance'
           });
         }

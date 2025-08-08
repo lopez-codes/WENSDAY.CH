@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { isUnauthorizedError } from "@/lib/authUtils";
@@ -7,8 +7,20 @@ import { apiRequest } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
-import { Bot, User, Send, Mic } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Bot, User, Send, Mic, Brain, Zap, Crown } from "lucide-react";
 import type { Message } from "@shared/schema";
+
+interface AIModel {
+  id: string;
+  name: string;
+  description: string;
+  provider: string;
+  pricing: 'free' | 'paid' | 'freemium';
+  capabilities: string[];
+  contextWindow?: number;
+}
 
 interface ChatInterfaceProps {
   isDemo?: boolean;
@@ -26,16 +38,37 @@ export default function ChatInterface({
   const [message, setMessage] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch available AI models
+  const { data: aiData } = useQuery({
+    queryKey: ['/api/ai-models'],
+    enabled: !!user && !isDemo,
+  });
+
+  const availableModels: AIModel[] = aiData?.models || [];
+  const userTier = aiData?.userTier || 'free';
 
   useEffect(() => {
     if (existingMessages && existingMessages.length !== messages.length) {
       setMessages(existingMessages);
     }
   }, [existingMessages, messages.length]);
+
+  // Set default model when models are loaded
+  useEffect(() => {
+    if (availableModels.length > 0 && !selectedModel) {
+      // Select the first premium model for paid users, first free model otherwise
+      const defaultModel = userTier === 'pro' 
+        ? availableModels.find(m => m.provider === 'google') || availableModels[0]
+        : availableModels.find(m => m.pricing === 'free') || availableModels[0];
+      setSelectedModel(defaultModel.id);
+    }
+  }, [availableModels, selectedModel, userTier]);
 
   useEffect(() => {
     scrollToBottom();
@@ -46,8 +79,8 @@ export default function ChatInterface({
   };
 
   const chatMutation = useMutation({
-    mutationFn: async ({ message, conversationId }: { message: string; conversationId?: string }) => {
-      const response = await apiRequest("POST", "/api/chat", { message, conversationId });
+    mutationFn: async ({ message, conversationId, selectedModel }: { message: string; conversationId?: string; selectedModel?: string }) => {
+      const response = await apiRequest("POST", "/api/chat", { message, conversationId, selectedModel });
       return response.json();
     },
     onSuccess: (data) => {
@@ -98,7 +131,8 @@ export default function ChatInterface({
     
     chatMutation.mutate({ 
       message: message.trim(), 
-      conversationId: conversationId || undefined 
+      conversationId: conversationId || undefined,
+      selectedModel: selectedModel || undefined
     });
     
     setMessage("");
@@ -133,6 +167,40 @@ export default function ChatInterface({
   const displayMessages = isDemo ? demoMessages : messages;
   const currentUser = user;
 
+  // Helper functions
+  const getModelDisplayName = () => {
+    if (isDemo) return "Google Gemini";
+    if (!selectedModel) return "Loading...";
+    const model = availableModels.find(m => m.id === selectedModel);
+    return model ? model.name : "AI Model";
+  };
+
+  const getModelIcon = (model: AIModel) => {
+    if (model.pricing === 'free') {
+      return <Badge variant="outline" className="text-xs bg-green-50 text-green-600 border-green-200">Free</Badge>;
+    } else if (model.pricing === 'freemium') {
+      return <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">Freemium</Badge>;
+    } else {
+      return <Badge variant="outline" className="text-xs bg-purple-50 text-purple-600 border-purple-200">Premium</Badge>;
+    }
+  };
+
+  const getModelBadge = (modelId: string) => {
+    const model = availableModels.find(m => m.id === modelId);
+    if (!model) return null;
+
+    if (model.provider === 'google') {
+      return <Badge className="text-xs bg-blue-50 text-blue-600">🚀 Google Gemini</Badge>;
+    } else if (model.provider === 'deepseek') {
+      return <Badge className="text-xs bg-purple-50 text-purple-600">🧠 DeepSeek</Badge>;
+    } else if (model.provider === 'openrouter') {
+      return <Badge className="text-xs bg-orange-50 text-orange-600">🌐 OpenRouter</Badge>;
+    } else if (model.provider === 'huggingface') {
+      return <Badge className="text-xs bg-yellow-50 text-yellow-600">🤗 HuggingFace</Badge>;
+    }
+    return <Badge className="text-xs bg-gray-50 text-gray-600">🤖 {model.provider}</Badge>;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Chat Header */}
@@ -144,7 +212,7 @@ export default function ChatInterface({
             </div>
             <div>
               <h3 className="font-bold text-lg">Swiss AI Multiverse</h3>
-              <p className="text-green-100 text-sm">Google Gemini • Independent Research</p>
+              <p className="text-green-100 text-sm">{getModelDisplayName()} • Multi-Provider AI</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
@@ -185,13 +253,11 @@ export default function ChatInterface({
               >
                 <p className="leading-relaxed">{msg.content}</p>
                 {msg.role === 'assistant' && msg.aiModel && (
-                  <div className="mt-3 flex space-x-2">
-                    <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-xs font-medium">
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="text-xs">
                       🇨🇭 Swiss AI
-                    </span>
-                    <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-full text-xs font-medium">
-                      🔬 {msg.aiModel === 'gemini-2.5-pro' ? 'Pro Model' : 'Research'}
-                    </span>
+                    </Badge>
+                    {getModelBadge(msg.aiModel)}
                   </div>
                 )}
               </div>
@@ -231,8 +297,43 @@ export default function ChatInterface({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
+      {/* Model Selection & Input Area */}
       <div className="p-6 border-t border-gray-200 bg-white">
+        {/* AI Model Selector */}
+        {!isDemo && availableModels.length > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700">AI Model:</label>
+              <div className="flex items-center space-x-2 text-xs text-gray-500">
+                <Zap className="w-3 h-3" />
+                <span>{availableModels.filter(m => m.pricing === 'free').length} kostenlose</span>
+                <Crown className="w-3 h-3 ml-2" />
+                <span>{availableModels.filter(m => m.pricing !== 'free').length} premium</span>
+              </div>
+            </div>
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Wählen Sie ein AI-Modell..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex items-center justify-between w-full">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="font-medium">{model.name}</span>
+                          {getModelIcon(model)}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">{model.description}</p>
+                      </div>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="flex items-center space-x-4">
           <Input
             type="text"
@@ -261,7 +362,7 @@ export default function ChatInterface({
         
         <div className="mt-4 flex items-center justify-between text-sm text-swiss-gray">
           <div className="flex items-center space-x-4">
-            <span>Powered by Google Gemini</span>
+            <span>Multi-AI Platform: {isDemo ? 'Gemini' : getModelDisplayName()}</span>
             <span>•</span>
             <span>Swiss Data Protection</span>
           </div>

@@ -212,6 +212,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete conversation route
+  app.delete('/api/conversations/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversationId = req.params.id;
+      
+      await storage.deleteConversation(conversationId, userId);
+      res.json({ message: "Conversation deleted successfully" });
+    } catch (error: any) {
+      console.error("Error deleting conversation:", error);
+      if (error.message.includes('not found') || error.message.includes('access denied')) {
+        return res.status(404).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
   // Subscription routes (disabled until Stripe is configured)
   app.post('/api/create-subscription', isAuthenticated, async (req: any, res) => {
     if (!stripe) {

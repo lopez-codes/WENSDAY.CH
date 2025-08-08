@@ -6,7 +6,7 @@ import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest } from "@/lib/queryClient";
 import Header from "@/components/layout/header";
 import Footer from "@/components/layout/footer";
-import ChatInterface from "@/components/chat/chat-interface";
+import SimpleChat from "@/components/chat/simple-chat";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -191,11 +191,15 @@ export default function Home() {
           <div className="lg:col-span-3">
             <Card className="h-[700px]">
               <CardContent className="p-0 h-full">
-                <ChatInterface 
+                <SimpleChat 
                   conversationId={selectedConversation}
                   existingMessages={messages}
                   onNewConversation={(id) => {
                     setSelectedConversation(id);
+                    queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
+                  }}
+                  onDeleteConversation={() => {
+                    setSelectedConversation(null);
                     queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });
                   }}
                 />

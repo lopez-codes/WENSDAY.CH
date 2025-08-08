@@ -18,7 +18,17 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   
   // Subscription operations
-  updateUserSubscription(userId: string, tier: string, stripeCustomerId?: string, stripeSubscriptionId?: string): Promise<User>;
+  updateUserSubscription(
+    userId: string,
+    subscriptionTier: string,
+    options?: {
+      stripeCustomerId?: string;
+      stripeSubscriptionId?: string;
+      postfinanceSubscriptionId?: number;
+      postfinanceTransactionId?: number;
+      paymentMethod?: 'stripe' | 'postfinance';
+    }
+  ): Promise<User>;
   
   // Message rate limiting
   incrementDailyMessageCount(userId: string): Promise<User>;
@@ -28,6 +38,9 @@ export interface IStorage {
   createConversation(conversation: InsertConversation): Promise<Conversation>;
   getUserConversations(userId: string): Promise<Conversation[]>;
   getConversation(id: string): Promise<Conversation | undefined>;
+  
+  // Conversation delete operations
+  deleteConversation(conversationId: string, userId: string): Promise<void>;
   
   // Message operations
   createMessage(message: InsertMessage): Promise<Message>;
@@ -56,25 +69,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  // Subscription operations
-  async updateUserSubscription(
-    userId: string, 
-    tier: string, 
-    stripeCustomerId?: string, 
-    stripeSubscriptionId?: string
-  ): Promise<User> {
-    const [user] = await db
-      .update(users)
-      .set({
-        subscriptionTier: tier,
-        stripeCustomerId,
-        stripeSubscriptionId,
-        updatedAt: new Date(),
-      })
-      .where(eq(users.id, userId))
-      .returning();
-    return user;
-  }
+  // Subscription operations (removed duplicate - using the one below with more options)
 
   // Message rate limiting
   async incrementDailyMessageCount(userId: string): Promise<User> {
@@ -181,6 +176,21 @@ export class DatabaseStorage implements IStorage {
       .from(messages)
       .where(eq(messages.conversationId, conversationId))
       .orderBy(messages.createdAt);
+  }
+
+  // Delete conversation and all its messages
+  async deleteConversation(conversationId: string, userId: string): Promise<void> {
+    // Verify conversation belongs to user
+    const conversation = await this.getConversation(conversationId);
+    if (!conversation || conversation.userId !== userId) {
+      throw new Error('Conversation not found or access denied');
+    }
+
+    // Delete messages first (foreign key constraint)
+    await db.delete(messages).where(eq(messages.conversationId, conversationId));
+    
+    // Delete conversation
+    await db.delete(conversations).where(eq(conversations.id, conversationId));
   }
 }
 

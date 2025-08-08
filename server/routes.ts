@@ -107,25 +107,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Simple system - conversation title already set
 
-      // Real Gemini API call - ONLY use GEMINI_API_KEY
+      // Real Gemini API call - Use GOOGLE_API_KEY (working key)
       const { GoogleGenAI } = await import('@google/genai');
       
-      // FORCE use GEMINI_API_KEY (not GOOGLE_API_KEY)
-      const geminiApiKey = process.env.GEMINI_API_KEY;
-      if (!geminiApiKey) {
-        throw new Error('GEMINI_API_KEY not configured');
+      // Use the working GOOGLE_API_KEY
+      const apiKey = process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        throw new Error('GOOGLE_API_KEY not configured');
       }
       
-      // Clear GOOGLE_API_KEY to force use of our key
-      const originalGoogleKey = process.env.GOOGLE_API_KEY;
-      delete process.env.GOOGLE_API_KEY;
-      
-      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
-      
-      // Restore original key after initialization 
-      if (originalGoogleKey) {
-        process.env.GOOGLE_API_KEY = originalGoogleKey;
-      }
+      const ai = new GoogleGenAI({ apiKey });
       
       const prompt = [...conversationHistory, { role: 'user', content: message }]
         .map(m => `${m.role}: ${m.content}`).join('\n\n');

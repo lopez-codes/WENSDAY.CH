@@ -57,7 +57,7 @@ export default function Home() {
   }
 
   const getRateLimit = () => {
-    switch (user.subscriptionTier) {
+    switch ((user as any)?.subscriptionTier) {
       case 'ultra': return 500;
       case 'pro': return -1; // unlimited
       default: return 10;
@@ -67,12 +67,12 @@ export default function Home() {
   const getUsedMessages = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const lastMessageDate = user.lastMessageDate ? new Date(user.lastMessageDate) : null;
+    const lastMessageDate = (user as any)?.lastMessageDate ? new Date((user as any).lastMessageDate) : null;
     
     if (!lastMessageDate || lastMessageDate < today) {
       return 0;
     }
-    return user.dailyMessageCount || 0;
+    return (user as any)?.dailyMessageCount || 0;
   };
 
   const limit = getRateLimit();
@@ -97,9 +97,9 @@ export default function Home() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-3">
-                  {user.profileImageUrl ? (
+                  {(user as any)?.profileImageUrl ? (
                     <img
-                      src={user.profileImageUrl}
+                      src={(user as any).profileImageUrl}
                       alt="Profile"
                       className="w-10 h-10 rounded-full object-cover"
                     />
@@ -109,8 +109,8 @@ export default function Home() {
                     </div>
                   )}
                   <div>
-                    <p className="font-medium">{user.firstName} {user.lastName}</p>
-                    <p className="text-sm text-swiss-gray">{user.email}</p>
+                    <p className="font-medium">{(user as any)?.firstName} {(user as any)?.lastName}</p>
+                    <p className="text-sm text-swiss-gray">{(user as any)?.email}</p>
                   </div>
                 </div>
                 
@@ -120,7 +120,7 @@ export default function Home() {
                   <div className="flex justify-between">
                     <span className="text-sm text-swiss-gray">Plan:</span>
                     <span className="text-sm font-medium capitalize">
-                      {user.subscriptionTier}
+                      {(user as any)?.subscriptionTier || 'free'}
                     </span>
                   </div>
                   <div className="flex justify-between">
@@ -131,7 +131,7 @@ export default function Home() {
                   </div>
                 </div>
 
-                {user.subscriptionTier === 'free' && (
+                {((user as any)?.subscriptionTier === 'free' || !(user as any)?.subscriptionTier) && (
                   <Button 
                     className="w-full bg-lopez-green hover:bg-lopez-green-dark"
                     onClick={() => window.location.href = '/subscribe'}
@@ -162,10 +162,10 @@ export default function Home() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {conversations.length === 0 ? (
+                  {(conversations as any[])?.length === 0 ? (
                     <p className="text-sm text-swiss-gray">No conversations yet</p>
                   ) : (
-                    conversations.map((conversation: Conversation) => (
+                    (conversations as any[])?.map((conversation: any) => (
                       <button
                         key={conversation.id}
                         onClick={() => setSelectedConversation(conversation.id)}
@@ -193,7 +193,7 @@ export default function Home() {
               <CardContent className="p-0 h-full">
                 <SimpleChat 
                   conversationId={selectedConversation}
-                  existingMessages={messages}
+                  existingMessages={messages as any}
                   onNewConversation={(id) => {
                     setSelectedConversation(id);
                     queryClient.invalidateQueries({ queryKey: ["/api/conversations"] });

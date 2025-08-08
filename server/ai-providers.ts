@@ -119,18 +119,16 @@ export class DeepSeekProvider implements AIProvider {
   ];
 
   isAvailable(): boolean {
-    return true; // DeepSeek has free web access, API key optional
+    return !!process.env.DEEPSEEK_API_KEY; // DeepSeek requires API key for reliable access
   }
 
   async generateResponse(model: string, messages: ChatMessage[], options?: GenerateOptions): Promise<string> {
-    try {
-      // If API key is available, use DeepSeek API
-      if (process.env.DEEPSEEK_API_KEY) {
-        return await this.generateWithAPI(model, messages, options);
-      }
+    if (!process.env.DEEPSEEK_API_KEY) {
+      throw new Error('DeepSeek API key not configured. Please add DEEPSEEK_API_KEY for access to DeepSeek models.');
+    }
 
-      // Fallback to web scraping approach (less reliable)
-      throw new Error('DeepSeek API key not configured. Please add DEEPSEEK_API_KEY for reliable access.');
+    try {
+      return await this.generateWithAPI(model, messages, options);
     } catch (error: any) {
       throw new Error(`DeepSeek error: ${error.message}`);
     }
@@ -207,12 +205,16 @@ export class OpenRouterProvider implements AIProvider {
   ];
 
   isAvailable(): boolean {
-    return true; // OpenRouter has free models without API key required
+    return !!process.env.OPENROUTER_API_KEY; // OpenRouter requires API key for reliable access
   }
 
   async generateResponse(model: string, messages: ChatMessage[], options?: GenerateOptions): Promise<string> {
+    if (!process.env.OPENROUTER_API_KEY) {
+      throw new Error('OpenRouter API key not configured. Please add OPENROUTER_API_KEY for access to these models.');
+    }
+
     try {
-      const apiKey = process.env.OPENROUTER_API_KEY || 'sk-or-v1-dummy'; // Some free models work without key
+      const apiKey = process.env.OPENROUTER_API_KEY;
       
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',

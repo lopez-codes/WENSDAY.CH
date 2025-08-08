@@ -125,15 +125,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         aiModel = selectedModel;
       } else {
-        // Default model selection based on subscription
-        if (user.subscriptionTier === 'pro') {
-          aiModel = 'gemini-2.5-pro';
+        // Default model selection - always fallback to Gemini Flash for reliability
+        if (user.isAdmin) {
+          aiModel = 'gemini-2.5-flash'; // Safe fallback for admin
+        } else if (user.subscriptionTier === 'pro') {
+          aiModel = 'gemini-2.5-flash'; // Use Flash instead of Pro for now
         } else if (user.subscriptionTier === 'ultra') {
           aiModel = 'gemini-2.5-flash';
         } else {
-          // Free users get access to free models only
-          const freeModels = aiProviderManager.getFreeModels();
-          aiModel = freeModels.length > 0 ? freeModels[0].id : 'deepseek/deepseek-r1:free';
+          // Free users - fallback to Gemini if available
+          const availableModels = aiProviderManager.getAllModels();
+          const geminiFlash = availableModels.find(m => m.id === 'gemini-2.5-flash');
+          aiModel = geminiFlash ? 'gemini-2.5-flash' : (availableModels.length > 0 ? availableModels[0].id : 'gemini-2.5-flash');
         }
       }
 

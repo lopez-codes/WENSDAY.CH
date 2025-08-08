@@ -283,19 +283,20 @@ export class HuggingFaceProvider implements AIProvider {
   ];
 
   isAvailable(): boolean {
-    return true; // Hugging Face has free tier without API key
+    return !!process.env.HUGGINGFACE_API_KEY; // Hugging Face requires API key for reliable access
   }
 
   async generateResponse(model: string, messages: ChatMessage[], options?: GenerateOptions): Promise<string> {
+    if (!process.env.HUGGINGFACE_API_KEY) {
+      throw new Error('Hugging Face API key not configured. Please add HUGGINGFACE_API_KEY for access to these models.');
+    }
+
     try {
       const apiKey = process.env.HUGGINGFACE_API_KEY;
       const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
       };
-      
-      if (apiKey) {
-        headers['Authorization'] = `Bearer ${apiKey}`;
-      }
 
       // Convert chat messages to single prompt for HF models
       const prompt = messages.map(m => `${m.role}: ${m.content}`).join('\n\n') + '\nassistant:';

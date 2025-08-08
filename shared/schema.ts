@@ -37,6 +37,7 @@ export const users = pgTable("users", {
   postfinanceTransactionId: integer("postfinance_transaction_id"),
   paymentMethod: varchar("payment_method").default("stripe"), // stripe, postfinance
   preferredAiModel: varchar("preferred_ai_model"), // user's preferred AI model
+  isAdmin: boolean("is_admin").default(false), // admin permissions
   dailyMessageCount: integer("daily_message_count").default(0),
   lastMessageDate: timestamp("last_message_date"),
   createdAt: timestamp("created_at").defaultNow(),

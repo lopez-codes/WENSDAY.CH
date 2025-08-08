@@ -115,8 +115,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Invalid AI model selected" });
         }
         
-        // Check if user has access based on subscription and model pricing
-        if (requestedModel.pricing === 'paid' && user.subscriptionTier === 'free') {
+        // Check if user has access based on subscription and model pricing (admins get full access)
+        if (!user.isAdmin && requestedModel.pricing === 'paid' && user.subscriptionTier === 'free') {
           return res.status(403).json({ 
             message: "Upgrade your subscription to access premium AI models",
             requiredTier: 'ultra'
@@ -206,10 +206,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allModels = aiProviderManager.getAllModels();
       const availableProviders = aiProviderManager.getAvailableProviders();
       
-      // Filter models based on subscription tier
+      // Filter models based on subscription tier and admin status
       let userModels;
-      if (user.subscriptionTier === 'pro') {
-        // Pro users get all available models
+      if (user.isAdmin || user.subscriptionTier === 'pro') {
+        // Admin users and Pro users get all available models
         userModels = allModels;
       } else if (user.subscriptionTier === 'ultra') {
         // Ultra users get free and freemium models

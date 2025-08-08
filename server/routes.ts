@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
-import { aiProviderManager } from "./ai-providers";
+// import { aiProviderManager } from "./ai-providers"; // Disabled for now
 import { insertMessageSchema, insertConversationSchema, users } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
@@ -153,7 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // AI Models route - get available models based on user subscription
+  // AI Models route - simplified for now (only Gemini available)
   app.get('/api/ai-models', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -163,25 +163,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      const allModels = aiProviderManager.getAllModels();
-      const availableProviders = aiProviderManager.getAvailableProviders();
+      // Simple response - only Gemini available for now
+      const allModels = [
+        {
+          id: 'gemini-2.5-flash',
+          name: 'Gemini 2.5 Flash',
+          description: 'Schnelle, ausgewogene Leistung für die meisten Aufgaben',
+          provider: 'google',
+          pricing: 'paid',
+          capabilities: ['text'],
+          contextWindow: 1000000
+        }
+      ];
+      const availableProviders = [{ name: 'Google Gemini', models: allModels, isAvailable: true }];
       
-      // Filter models based on subscription tier and admin status
-      let userModels;
-      if (user.isAdmin || user.subscriptionTier === 'pro') {
-        // Admin users and Pro users get all available models
-        userModels = allModels;
-      } else if (user.subscriptionTier === 'ultra') {
-        // Ultra users get free and freemium models
-        userModels = allModels.filter(model => model.pricing !== 'paid' || model.provider === 'google');
-      } else {
-        // Free users get only free models
-        userModels = allModels.filter(model => model.pricing === 'free');
-      }
+      // Everyone gets Gemini for now - simplified
+      const userModels = allModels;
 
       res.json({
         models: userModels,
-        providers: availableProviders.map(p => ({ name: p.name, isAvailable: p.isAvailable() })),
+        providers: availableProviders,
         userTier: user.subscriptionTier
       });
     } catch (error) {

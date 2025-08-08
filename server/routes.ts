@@ -107,13 +107,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Simple system - conversation title already set
 
-      // Real Gemini API call - Use GOOGLE_API_KEY (working key)
+      // Real Gemini API call - Use GEMINI_API_KEY with fallback to GOOGLE_API_KEY
       const { GoogleGenAI } = await import('@google/genai');
       
-      // Use the working GOOGLE_API_KEY
-      const apiKey = process.env.GOOGLE_API_KEY;
+      // Try GEMINI_API_KEY first, fallback to GOOGLE_API_KEY
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       if (!apiKey) {
-        throw new Error('GOOGLE_API_KEY not configured');
+        throw new Error('Neither GEMINI_API_KEY nor GOOGLE_API_KEY configured');
       }
       
       const ai = new GoogleGenAI({ apiKey });

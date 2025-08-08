@@ -108,13 +108,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Skip AI title generation for now - keep simple titles
       // conversation.title is already set above
 
-      // Direct Gemini API call - back to original working version
+      // Direct Gemini API call - explicitly use GEMINI_API_KEY
       const { GoogleGenAI } = await import('@google/genai');
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('Gemini API not configured');
+      const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!geminiApiKey) {
+        throw new Error('Gemini API key not configured');
       }
       
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
       const prompt = [...conversationHistory, { role: 'user', content: message }]
         .map(m => `${m.role}: ${m.content}`).join('\n\n');
       

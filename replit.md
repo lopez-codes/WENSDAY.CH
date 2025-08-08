@@ -2,7 +2,24 @@
 
 This is a Swiss AI chat platform called "wensday.ch" that provides professional research capabilities through multiple AI models. The application is built as a full-stack web platform with a React frontend and Express.js backend, featuring subscription-based access tiers, chat functionality with conversation history, and integration with external services like Google's Gemini AI and Stripe for payments.
 
-## Recent Updates (January 7, 2025)
+## Version History
+
+### v1 - Working Swiss AI Chat Platform (August 8, 2025) ✅
+**FULLY FUNCTIONAL - BACKUP POINT**
+- ✅ Real Gemini API responses working with valid GEMINI_API_KEY
+- ✅ Chat delete functionality implemented and tested
+- ✅ Swiss German AI assistant responding correctly
+- ✅ Rate limits: 10 free messages/day, 500 ultra, unlimited pro
+- ✅ Conversation history saved and loadable
+- ✅ Simple, reliable chat interface (like 07.08 working version)
+- ✅ PostFinance payment integration ready
+- ✅ Database cleaned (removed problematic chats after 07.08)
+- ✅ Both GEMINI_API_KEY and GOOGLE_API_KEY with same working value
+- ✅ No 500 errors, stable API responses
+- ✅ Authentication with Replit OpenID working
+- ✅ User profile, subscription tiers, message limits all functional
+
+### Previous Updates (January 7, 2025)
 - Fixed application startup to work without API keys initially
 - Added temporary placeholder icons for partner logos  
 - Configured database schema and migrations

@@ -107,20 +107,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Simple system - conversation title already set
 
-      // Real Gemini API call - force use of GEMINI_API_KEY only
+      // Real Gemini API call - ONLY use GEMINI_API_KEY
       const { GoogleGenAI } = await import('@google/genai');
       
-      // Get the correct API key
+      // FORCE use GEMINI_API_KEY (not GOOGLE_API_KEY)
       const geminiApiKey = process.env.GEMINI_API_KEY;
       if (!geminiApiKey) {
         throw new Error('GEMINI_API_KEY not configured');
       }
       
-      // IMPORTANT: Create a clean environment without GOOGLE_API_KEY to force library to use our key
-      const cleanEnv = { ...process.env };
-      delete cleanEnv.GOOGLE_API_KEY;
+      // Clear GOOGLE_API_KEY to force use of our key
+      const originalGoogleKey = process.env.GOOGLE_API_KEY;
+      delete process.env.GOOGLE_API_KEY;
       
       const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+      
+      // Restore original key after initialization 
+      if (originalGoogleKey) {
+        process.env.GOOGLE_API_KEY = originalGoogleKey;
+      }
       
       const prompt = [...conversationHistory, { role: 'user', content: message }]
         .map(m => `${m.role}: ${m.content}`).join('\n\n');
@@ -226,6 +231,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
+  // Admin route to delete conversations after a specific date
+  app.delete('/api/admin/conversations/after/:date', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const dateParam = req.params.date;
+      
+      // Only allow for admin user (you)
+      if (userId !== '28946914') {
+        return res.status(403).json({ message: 'Admin access required' });
+      }
+      
+      const afterDate = new Date(dateParam);
+      await storage.deleteConversationsAfterDate(userId, afterDate);
+      res.json({ message: `Conversations after ${dateParam} deleted successfully` });
+    } catch (error: any) {
+      console.error("Error deleting conversations:", error);
+      res.status(500).json({ message: "Failed to delete conversations" });
     }
   });
 

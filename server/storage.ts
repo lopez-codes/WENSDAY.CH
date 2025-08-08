@@ -41,6 +41,7 @@ export interface IStorage {
   
   // Conversation delete operations
   deleteConversation(conversationId: string, userId: string): Promise<void>;
+  deleteConversationsAfterDate(userId: string, afterDate: Date): Promise<void>;
   
   // Message operations
   createMessage(message: InsertMessage): Promise<Message>;
@@ -191,6 +192,29 @@ export class DatabaseStorage implements IStorage {
     
     // Delete conversation
     await db.delete(conversations).where(eq(conversations.id, conversationId));
+  }
+
+  // Delete all conversations after a specific date
+  async deleteConversationsAfterDate(userId: string, afterDate: Date): Promise<void> {
+    // Get conversations to delete
+    const conversationsToDelete = await db
+      .select()
+      .from(conversations)
+      .where(and(
+        eq(conversations.userId, userId),
+        gte(conversations.createdAt, afterDate)
+      ));
+
+    // Delete messages for each conversation
+    for (const conversation of conversationsToDelete) {
+      await db.delete(messages).where(eq(messages.conversationId, conversation.id));
+    }
+
+    // Delete conversations
+    await db.delete(conversations).where(and(
+      eq(conversations.userId, userId),
+      gte(conversations.createdAt, afterDate)
+    ));
   }
 }
 

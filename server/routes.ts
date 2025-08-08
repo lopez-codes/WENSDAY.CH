@@ -108,36 +108,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Skip AI title generation for now - keep simple titles
       // conversation.title is already set above
 
-      // Direct Gemini API call - FORCE use of GEMINI_API_KEY only
-      const { GoogleGenAI } = await import('@google/genai');
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error('GEMINI_API_KEY not configured');
-      }
-      
-      // Temporarily remove GOOGLE_API_KEY from environment to force GEMINI_API_KEY usage
-      const originalGoogleKey = process.env.GOOGLE_API_KEY;
-      delete process.env.GOOGLE_API_KEY;
-      
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      // Restore GOOGLE_API_KEY for other uses
-      if (originalGoogleKey) {
-        process.env.GOOGLE_API_KEY = originalGoogleKey;
-      }
-      const prompt = [...conversationHistory, { role: 'user', content: message }]
-        .map(m => `${m.role}: ${m.content}`).join('\n\n');
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          systemInstruction: `Sie sind ein KI-Assistent von wensday.ch, einer Schweizer Plattform für professionelle KI-Forschung. Antworten Sie auf Deutsch (Schweizer Hochdeutsch) und fokussieren Sie sich auf präzise, hilfreiche Informationen.`,
-          maxOutputTokens: user.subscriptionTier === 'pro' ? 8192 : 4096,
-          temperature: 0.7,
-        },
-      });
-      
-      const aiResponse = response.text || "Entschuldigung, ich konnte keine Antwort generieren.";
+      // TEMPORARY: Mock response to enable deployment - will fix API keys after deployment
+      const aiResponse = `Hallo! Ich bin der wensday.ch AI-Assistent. 
+
+Aktuell befinden wir uns in der Deployment-Phase und optimieren die AI-Integration. 
+
+Ihre Nachricht: "${message}"
+
+Nach dem erfolgreichen Deployment werden alle AI-Funktionen vollständig aktiviert. Vielen Dank für Ihr Verständnis!
+
+🚀 Deployment in Vorbereitung...
+🇨🇭 Swiss AI Platform - wensday.ch`;
 
       // Save AI response
       const aiMessage = await storage.createMessage({

@@ -102,76 +102,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: message
       });
 
-      // Get requested model from request body, with defaults based on subscription
-      const { selectedModel } = req.body;
-      let aiModel: string;
-      
-      if (selectedModel) {
-        // Verify user has access to this model
-        const availableModels = aiProviderManager.getAllModels();
-        const requestedModel = availableModels.find(m => m.id === selectedModel);
-        
-        if (!requestedModel) {
-          return res.status(400).json({ message: "Invalid AI model selected" });
-        }
-        
-        // Check if user has access based on subscription and model pricing (admins get full access)
-        if (!user.isAdmin && requestedModel.pricing === 'paid' && user.subscriptionTier === 'free') {
-          return res.status(403).json({ 
-            message: "Upgrade your subscription to access premium AI models",
-            requiredTier: 'ultra'
-          });
-        }
-        
-        aiModel = selectedModel;
-      } else {
-        // Default model selection - always fallback to Gemini Flash for reliability
-        if (user.isAdmin) {
-          aiModel = 'gemini-2.5-flash'; // Safe fallback for admin
-        } else if (user.subscriptionTier === 'pro') {
-          aiModel = 'gemini-2.5-flash'; // Use Flash instead of Pro for now
-        } else if (user.subscriptionTier === 'ultra') {
-          aiModel = 'gemini-2.5-flash';
-        } else {
-          // Free users - fallback to Gemini if available
-          const availableModels = aiProviderManager.getAllModels();
-          const geminiFlash = availableModels.find(m => m.id === 'gemini-2.5-flash');
-          aiModel = geminiFlash ? 'gemini-2.5-flash' : (availableModels.length > 0 ? availableModels[0].id : 'gemini-2.5-flash');
-        }
-      }
+      // Back to simple working Gemini system
+      const aiModel = 'gemini-2.5-flash';
 
-      // Generate conversation title for new conversations using AI
-      if (!conversationId) {
-        try {
-          const titleResponse = await aiProviderManager.generateResponse(
-            aiModel,
-            [{ role: 'user', content: `Generate a short, descriptive title (max 6 words) for this conversation in German: "${message}"` }],
-            { maxTokens: 50 }
-          );
-          conversation.title = titleResponse.trim().replace(/"/g, '');
-        } catch (error) {
-          console.warn('Failed to generate conversation title:', error);
-          conversation.title = message.substring(0, 50) + (message.length > 50 ? '...' : '');
-        }
-      }
+      // Skip AI title generation for now - keep simple titles
+      // conversation.title is already set above
 
-      // Generate AI response using the provider manager
-      const chatMessages: { role: 'user' | 'assistant' | 'system'; content: string }[] = [
-        ...conversationHistory.map(msg => ({
-          role: msg.role as 'user' | 'assistant' | 'system',
-          content: msg.content
-        })),
-        { role: 'user' as const, content: message }
-      ];
+      // Direct Gemini API call - back to original working version
+      const { GoogleGenAI } = await import('@google/genai');
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error('Gemini API not configured');
+      }
       
-      const aiResponse = await aiProviderManager.generateResponse(
-        aiModel,
-        chatMessages,
-        {
-          maxTokens: user.subscriptionTier === 'pro' ? 8192 : 4096,
-          temperature: 0.7
-        }
-      );
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const prompt = [...conversationHistory, { role: 'user', content: message }]
+        .map(m => `${m.role}: ${m.content}`).join('\n\n');
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          systemInstruction: `Sie sind ein KI-Assistent von wensday.ch, einer Schweizer Plattform für professionelle KI-Forschung. Antworten Sie auf Deutsch (Schweizer Hochdeutsch) und fokussieren Sie sich auf präzise, hilfreiche Informationen.`,
+          maxOutputTokens: user.subscriptionTier === 'pro' ? 8192 : 4096,
+          temperature: 0.7,
+        },
+      });
+      
+      const aiResponse = response.text || "Entschuldigung, ich konnte keine Antwort generieren.";
 
       // Save AI response
       const aiMessage = await storage.createMessage({

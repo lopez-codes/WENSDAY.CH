@@ -107,14 +107,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Simple system - conversation title already set
 
-      // Simple working Gemini response like at the beginning
-      const aiResponse = `Vielen Dank für Ihre Nachricht: "${message}"
-
-Ich bin der AI-Assistent von wensday.ch, der Schweizer Plattform für professionelle KI-Forschung. 
-
-Das System funktioniert und ist bereit für den Einsatz! Nach dem Deployment werden wir die volle Gemini AI Integration aktivieren.
-
-🇨🇭 Schweizer KI-Technologie - wensday.ch`;
+      // Real Gemini API call - force use of GEMINI_API_KEY only
+      const { GoogleGenAI } = await import('@google/genai');
+      
+      // Get the correct API key
+      const geminiApiKey = process.env.GEMINI_API_KEY;
+      if (!geminiApiKey) {
+        throw new Error('GEMINI_API_KEY not configured');
+      }
+      
+      // IMPORTANT: Create a clean environment without GOOGLE_API_KEY to force library to use our key
+      const cleanEnv = { ...process.env };
+      delete cleanEnv.GOOGLE_API_KEY;
+      
+      const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+      
+      const prompt = [...conversationHistory, { role: 'user', content: message }]
+        .map(m => `${m.role}: ${m.content}`).join('\n\n');
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+          systemInstruction: `Sie sind ein KI-Assistent von wensday.ch, einer Schweizer Plattform für professionelle KI-Forschung. Antworten Sie auf Deutsch (Schweizer Hochdeutsch) und fokussieren Sie sich auf präzise, hilfreiche Informationen.`,
+          maxOutputTokens: user.subscriptionTier === 'pro' ? 8192 : 4096,
+          temperature: 0.7,
+        },
+      });
+      
+      const aiResponse = response.text || "Entschuldigung, ich konnte keine Antwort generieren.";
 
       // Save AI response
       const aiMessage = await storage.createMessage({

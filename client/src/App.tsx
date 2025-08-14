@@ -22,6 +22,7 @@ function Router() {
       {isLoading || !isAuthenticated ? (
         <>
           <Route path="/" component={Landing} />
+          <Route path="/ecosystem" component={Ecosystem} />
           <Route path="/subscribe" component={Subscribe} />
         </>
       ) : (

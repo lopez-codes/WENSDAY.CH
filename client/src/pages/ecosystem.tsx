@@ -296,40 +296,6 @@ export default function EcosystemPage() {
       </div>
 
       <Footer />
-
-      <style>{`
-        .cube-container {
-          width: 150px;
-          height: 150px;
-          position: relative;
-          margin: 100px auto;
-        }
-        
-        .cube-face {
-          position: absolute;
-          width: 150px;
-          height: 150px;
-          border: 2px solid rgba(255, 255, 255, 0.1);
-          border-radius: 8px;
-          backdrop-filter: blur(10px);
-        }
-        
-        .cube-face-front { transform: rotateY(0deg) translateZ(75px); }
-        .cube-face-back { transform: rotateY(180deg) translateZ(75px); }
-        .cube-face-right { transform: rotateY(90deg) translateZ(75px); }
-        .cube-face-left { transform: rotateY(-90deg) translateZ(75px); }
-        .cube-face-top { transform: rotateX(90deg) translateZ(75px); }
-        .cube-face-bottom { transform: rotateX(-90deg) translateZ(75px); }
-        
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-10px); }
-        }
-        
-        .cube-container:hover {
-          animation: float 3s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }

@@ -177,7 +177,7 @@ export default function Contact() {
                   <Mail className="w-5 h-5 text-lopez-green mt-1" />
                   <div>
                     <h4 className="font-semibold">E-Mail</h4>
-                    <p className="text-sm text-swiss-gray">info@lopez.codes</p>
+                    <p className="text-sm text-swiss-gray">alpha@lopez.codes</p>
                     <p className="text-sm text-swiss-gray">contact@lopez.codes</p>
                   </div>
                 </div>

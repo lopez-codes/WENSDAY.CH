@@ -185,7 +185,7 @@ export default function About() {
               <div>
                 <h4 className="font-semibold mb-2">Kontakt</h4>
                 <p className="text-sm text-swiss-gray">
-                  E-Mail: info@lopez.codes<br />
+                  E-Mail: alpha@lopez.codes<br />
                   Web: https://lopez.codes<br />
                   UID: CHE-316.025.450
                 </p>

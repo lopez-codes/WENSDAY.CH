@@ -58,36 +58,41 @@ export default function Header() {
             )}
             
             {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2">
-                    {(user as any)?.profileImageUrl ? (
-                      <img 
-                        src={(user as any).profileImageUrl} 
-                        alt="Profile" 
-                        className="w-6 h-6 rounded-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-6 h-6" />
-                    )}
-                    <span>{(user as any)?.firstName || (user as any)?.email}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link href="/ecosystem">AI-Ökosystem</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/settings">Settings</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/subscribe">Subscription</Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => window.location.href = '/api/logout'}>
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <>
+                <Link href="/ecosystem" className="text-swiss-gray hover:text-lopez-green transition-colors font-medium">
+                  AI-Ökosystem
+                </Link>
+                <Link href="/styles-overview" className="text-swiss-gray hover:text-lopez-green transition-colors font-medium">
+                  Styles
+                </Link>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="flex items-center space-x-2">
+                      {(user as any)?.profileImageUrl ? (
+                        <img 
+                          src={(user as any).profileImageUrl} 
+                          alt="Profile" 
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <User className="w-6 h-6" />
+                      )}
+                      <span>{(user as any)?.firstName || (user as any)?.email}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem asChild>
+                      <Link href="/settings">Settings</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/subscribe">Subscription</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => window.location.href = '/api/logout'}>
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </>
             ) : (
               <Button 
                 className="bg-lopez-green text-white hover:bg-lopez-green-dark"

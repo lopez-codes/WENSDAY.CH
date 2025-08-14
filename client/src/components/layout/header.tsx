@@ -40,6 +40,9 @@ export default function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-6 flex-1">
+          <Link href="/chat" className="text-swiss-gray hover:text-lopez-green transition-colors">
+            Chat
+          </Link>
           <Link href="/ecosystem" className="text-swiss-gray hover:text-lopez-green transition-colors">
             AI-Ökosystem
           </Link>
@@ -48,9 +51,6 @@ export default function Header() {
           </Link>
           <Link href="/firebase-overview" className="text-swiss-gray hover:text-lopez-green transition-colors">
             Firebase
-          </Link>
-          <Link href="/styles-overview" className="text-swiss-gray hover:text-lopez-green transition-colors">
-            Styles
           </Link>
         </nav>
 
@@ -104,6 +104,9 @@ export default function Header() {
               <SheetTitle>Navigation</SheetTitle>
             </SheetHeader>
             <nav className="flex flex-col space-y-4 mt-6">
+              <Link href="/chat" className="text-swiss-gray hover:text-lopez-green transition-colors">
+                Chat
+              </Link>
               <Link href="/ecosystem" className="text-swiss-gray hover:text-lopez-green transition-colors">
                 AI-Ökosystem
               </Link>
@@ -112,9 +115,6 @@ export default function Header() {
               </Link>
               <Link href="/firebase-overview" className="text-swiss-gray hover:text-lopez-green transition-colors">
                 Firebase
-              </Link>
-              <Link href="/styles-overview" className="text-swiss-gray hover:text-lopez-green transition-colors">
-                Styles
               </Link>
               
               <div className="border-t pt-4">

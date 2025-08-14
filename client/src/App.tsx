@@ -19,6 +19,7 @@ import About from "@/pages/about";
 import Contact from "@/pages/contact";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
+import Chat from "@/pages/chat";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -34,6 +35,7 @@ function Router() {
           <Route path="/crowdfunding" component={Crowdfunding} />
           <Route path="/firebase-overview" component={FirebaseOverview} />
           <Route path="/subscribe" component={Subscribe} />
+          <Route path="/chat" component={Chat} />
           <Route path="/about" component={About} />
           <Route path="/contact" component={Contact} />
           <Route path="/privacy" component={Privacy} />
@@ -42,6 +44,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Home} />
+          <Route path="/chat" component={Chat} />
           <Route path="/ecosystem" component={Ecosystem} />
           <Route path="/styles-overview" component={StylesOverview} />
           <Route path="/crowdfunding" component={Crowdfunding} />

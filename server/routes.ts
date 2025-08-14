@@ -213,6 +213,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Send message to conversation
+  app.post('/api/conversations/:id/messages', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const conversationId = req.params.id;
+      const { content, role } = req.body;
+
+      if (!content || typeof content !== 'string') {
+        return res.status(400).json({ message: "Message content is required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Check rate limits
+      const limit = RATE_LIMITS[user.subscriptionTier as keyof typeof RATE_LIMITS] || RATE_LIMITS.free;
+      if (limit > 0 && (user.dailyMessageCount || 0) >= limit) {
+        return res.status(429).json({ 
+          message: "Daily message limit reached. Please upgrade your subscription for more messages.",
+          limit,
+          used: user.dailyMessageCount || 0
+        });
+      }
+
+      // Verify conversation ownership
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation || conversation.userId !== userId) {
+        return res.status(404).json({ message: "Conversation not found" });
+      }
+
+      // Save user message
+      await storage.createMessage({
+        conversationId: conversationId,
+        role: "user",
+        content: content
+      });
+
+      // Get conversation history for AI context
+      const messages = await storage.getConversationMessages(conversationId);
+      const conversationHistory = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }));
+
+      // Generate AI response
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        throw new Error('No API key configured');
+      }
+
+      const qualityController = new AIQualityController(apiKey);
+      
+      // Build business context from user profile
+      const businessContext = {
+        industry: user.industry || undefined,
+        companySize: user.companySize || undefined,
+        businessGoals: (user.businessGoals as string[]) || [],
+        errorTolerance: user.errorToleranceLevel || 'medium'
+      };
+
+      // Generate business-focused response with quality analysis
+      const { content: aiContent, qualityAnalysis } = await qualityController.generateBusinessResponse(
+        content,
+        conversationHistory,
+        businessContext
+      );
+
+      // Save AI response with quality control data
+      const aiMessage = await storage.createMessage({
+        conversationId: conversationId,
+        role: "assistant",
+        content: aiContent,
+        aiModel: 'gemini-2.5-flash',
+        hasErrors: qualityAnalysis.hasErrors,
+        errorDetails: qualityAnalysis.errorDetails,
+        confidenceScore: qualityAnalysis.confidenceScore,
+        businessCategory: qualityAnalysis.businessCategory,
+        needsReview: qualityAnalysis.needsReview,
+        factChecked: qualityAnalysis.factChecked,
+        sources: qualityAnalysis.sources
+      });
+
+      // Increment user's daily message count
+      await storage.incrementDailyMessageCount(userId);
+
+      res.json({
+        message: aiMessage,
+        remaining: limit > 0 ? Math.max(0, limit - (user.dailyMessageCount || 0) - 1) : -1
+      });
+
+    } catch (error) {
+      console.error("Error sending message:", error);
+      res.status(500).json({ message: "Failed to send message" });
+    }
+  });
+
   // Delete conversation route
   app.delete('/api/conversations/:id', isAuthenticated, async (req: any, res) => {
     try {
@@ -227,6 +325,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to delete conversation" });
+    }
+  });
+
+  // Create new conversation
+  app.post('/api/conversations', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { title } = req.body;
+
+      const conversation = await storage.createConversation({
+        userId,
+        title: title || "Neues Gespräch"
+      });
+
+      res.json(conversation);
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      res.status(500).json({ message: "Failed to create conversation" });
     }
   });
 

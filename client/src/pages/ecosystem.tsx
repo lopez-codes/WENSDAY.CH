@@ -129,15 +129,8 @@ export default function EcosystemPage() {
         <div className="grid lg:grid-cols-2 gap-12">
           {/* 3D Cube Visualization */}
           <div className="flex flex-col items-center">
-            <div className="relative w-80 h-80 mb-8" style={{ perspective: '1000px' }}>
-              <div 
-                className="cube-container"
-                style={{
-                  transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
-                  transformStyle: 'preserve-3d',
-                  transition: selectedFace ? 'transform 0.8s ease' : 'none'
-                }}
-              >
+            <div className="relative w-96 h-96 mb-8" style={{ perspective: '1200px' }}>
+              <div className="cube-container">
                 {ecosystemFaces.map((face, index) => (
                   <motion.div
                     key={face.id}

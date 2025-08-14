@@ -507,6 +507,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Crowdfunding routes
+  app.post('/api/crowdfunding/pledge', async (req, res) => {
+    try {
+      const { tierType, amount, customAmount, userInfo } = req.body;
+      
+      // Mock PostFinance integration - in real implementation, use PostFinance Checkout API
+      const pledgeData = {
+        id: `pledge_${Date.now()}`,
+        amount: customAmount || amount,
+        tier: tierType,
+        user: userInfo,
+        status: 'pending',
+        paymentMethod: 'postfinance',
+        created: new Date().toISOString()
+      };
+
+      // Here you would integrate with PostFinance Checkout API
+      console.log('Processing PostFinance pledge:', pledgeData);
+      
+      res.json({
+        success: true,
+        pledgeId: pledgeData.id,
+        redirectUrl: `/crowdfunding/thank-you?pledge=${pledgeData.id}`
+      });
+    } catch (error) {
+      console.error('Crowdfunding pledge error:', error);
+      res.status(500).json({ message: 'Pledge processing failed' });
+    }
+  });
+
+  app.get('/api/crowdfunding/stats', async (req, res) => {
+    try {
+      // Mock campaign statistics - in real implementation, fetch from database
+      const stats = {
+        goal: 250000,
+        raised: 87500 + Math.floor(Math.random() * 5000), // Add some dynamic variation
+        backers: 342 + Math.floor(Math.random() * 10),
+        daysLeft: 45,
+        recentPledges: [
+          { amount: 100, tier: 'contributor', timestamp: Date.now() - 3600000 },
+          { amount: 500, tier: 'patron', timestamp: Date.now() - 7200000 },
+          { amount: 25, tier: 'supporter', timestamp: Date.now() - 10800000 }
+        ]
+      };
+      
+      res.json(stats);
+    } catch (error) {
+      console.error('Error fetching crowdfunding stats:', error);
+      res.status(500).json({ message: 'Failed to fetch campaign stats' });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

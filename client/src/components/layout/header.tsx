@@ -42,12 +42,9 @@ export default function Header() {
                 <Link href="/styles-overview" className="text-swiss-gray hover:text-lopez-green transition-colors">
                   Styles
                 </Link>
-                <button 
-                  onClick={() => scrollToSection('pricing')}
-                  className="text-swiss-gray hover:text-lopez-green transition-colors"
-                >
-                  Pricing
-                </button>
+                <Link href="/crowdfunding" className="text-swiss-gray hover:text-lopez-green transition-colors">
+                  Crowdfunding
+                </Link>
               </>
             )}
             
@@ -58,6 +55,9 @@ export default function Header() {
                 </Link>
                 <Link href="/styles-overview" className="text-swiss-gray hover:text-lopez-green transition-colors font-medium">
                   Styles
+                </Link>
+                <Link href="/crowdfunding" className="text-swiss-gray hover:text-lopez-green transition-colors font-medium">
+                  Crowdfunding
                 </Link>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

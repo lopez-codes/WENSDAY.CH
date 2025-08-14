@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import Ecosystem from "@/pages/ecosystem";
 import StylesOverview from "@/pages/styles-overview";
 import Crowdfunding from "@/pages/crowdfunding";
+import FirebaseOverview from "@/pages/firebase-overview";
 import SettingsPage from "@/pages/settings";
 import Subscribe from "@/pages/subscribe";
 import PostFinanceSubscribe from "@/pages/postfinance-subscribe";
@@ -27,6 +28,7 @@ function Router() {
           <Route path="/ecosystem" component={Ecosystem} />
           <Route path="/styles-overview" component={StylesOverview} />
           <Route path="/crowdfunding" component={Crowdfunding} />
+          <Route path="/firebase-overview" component={FirebaseOverview} />
           <Route path="/subscribe" component={Subscribe} />
         </>
       ) : (
@@ -35,6 +37,7 @@ function Router() {
           <Route path="/ecosystem" component={Ecosystem} />
           <Route path="/styles-overview" component={StylesOverview} />
           <Route path="/crowdfunding" component={Crowdfunding} />
+          <Route path="/firebase-overview" component={FirebaseOverview} />
           <Route path="/settings" component={SettingsPage} />
           <Route path="/subscribe" component={Subscribe} />
           <Route path="/postfinance-subscribe" component={PostFinanceSubscribe} />

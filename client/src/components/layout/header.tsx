@@ -45,6 +45,9 @@ export default function Header() {
                 <Link href="/crowdfunding" className="text-swiss-gray hover:text-lopez-green transition-colors">
                   Crowdfunding
                 </Link>
+                <Link href="/firebase-overview" className="text-swiss-gray hover:text-lopez-green transition-colors">
+                  Firebase
+                </Link>
               </>
             )}
             
@@ -58,6 +61,9 @@ export default function Header() {
                 </Link>
                 <Link href="/crowdfunding" className="text-swiss-gray hover:text-lopez-green transition-colors font-medium">
                   Crowdfunding
+                </Link>
+                <Link href="/firebase-overview" className="text-swiss-gray hover:text-lopez-green transition-colors font-medium">
+                  Firebase
                 </Link>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

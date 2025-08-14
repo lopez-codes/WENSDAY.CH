@@ -1,4 +1,5 @@
 import { SiX, SiLinkedin, SiGithub } from "react-icons/si";
+import { Link } from "wouter";
 
 export default function Footer() {
   return (
@@ -34,20 +35,20 @@ export default function Footer() {
           <div>
             <h4 className="font-semibold mb-4">Company</h4>
             <ul className="space-y-2 text-gray-400">
-              <li><a href="#" className="hover:text-lopez-green transition-colors">About</a></li>
-              <li><a href="#" className="hover:text-lopez-green transition-colors">Research</a></li>
+              <li><Link href="/about" className="hover:text-lopez-green transition-colors">About</Link></li>
+              <li><Link href="/contact" className="hover:text-lopez-green transition-colors">Kontakt</Link></li>
               <li><a href="#partners" className="hover:text-lopez-green transition-colors">Partners</a></li>
-              <li><a href="#" className="hover:text-lopez-green transition-colors">Careers</a></li>
+              <li><Link href="/contact" className="hover:text-lopez-green transition-colors">Careers</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-semibold mb-4">Support</h4>
             <ul className="space-y-2 text-gray-400">
-              <li><a href="#" className="hover:text-lopez-green transition-colors">Documentation</a></li>
-              <li><a href="#" className="hover:text-lopez-green transition-colors">Help Center</a></li>
-              <li><a href="#" className="hover:text-lopez-green transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-lopez-green transition-colors">Terms</a></li>
+              <li><Link href="/contact" className="hover:text-lopez-green transition-colors">Documentation</Link></li>
+              <li><Link href="/contact" className="hover:text-lopez-green transition-colors">Help Center</Link></li>
+              <li><Link href="/privacy" className="hover:text-lopez-green transition-colors">Datenschutz</Link></li>
+              <li><Link href="/terms" className="hover:text-lopez-green transition-colors">AGB</Link></li>
             </ul>
           </div>
         </div>

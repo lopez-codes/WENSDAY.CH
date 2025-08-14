@@ -15,6 +15,10 @@ import Subscribe from "@/pages/subscribe";
 import PostFinanceSubscribe from "@/pages/postfinance-subscribe";
 import SubscriptionSuccess from "@/pages/subscription-success";
 import SubscriptionFailed from "@/pages/subscription-failed";
+import About from "@/pages/about";
+import Contact from "@/pages/contact";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -30,6 +34,10 @@ function Router() {
           <Route path="/crowdfunding" component={Crowdfunding} />
           <Route path="/firebase-overview" component={FirebaseOverview} />
           <Route path="/subscribe" component={Subscribe} />
+          <Route path="/about" component={About} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/terms" component={Terms} />
         </>
       ) : (
         <>
@@ -43,6 +51,10 @@ function Router() {
           <Route path="/postfinance-subscribe" component={PostFinanceSubscribe} />
           <Route path="/subscription-success" component={SubscriptionSuccess} />
           <Route path="/subscription-failed" component={SubscriptionFailed} />
+          <Route path="/about" component={About} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/terms" component={Terms} />
         </>
       )}
       <Route component={NotFound} />

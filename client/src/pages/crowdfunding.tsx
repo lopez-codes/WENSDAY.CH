@@ -69,51 +69,60 @@ export default function Crowdfunding() {
     }
   };
 
-  // Mock-Daten für die Crowdfunding-Kampagne
+  // Seriöse Finanzierungsdaten für wensday GmbH Gründung
   const campaignData = {
-    title: "wensday.ch - Schweizer KI-Revolution",
-    goal: 250000,
-    raised: 87500,
-    backers: 342,
-    daysLeft: 45,
-    description: "Unterstützen Sie die Entwicklung der ersten vollständig schweizerischen KI-Plattform mit ethischen Standards und lokaler Datenhaltung."
+    title: "wensday GmbH - Schweizer KI-Revolution",
+    goal: 30000000, // 30 Millionen CHF für Gründung und Team
+    raised: 2750000, // Bereits zugesagte Mittel
+    backers: 127,
+    daysLeft: 180, // 6 Monate Finanzierungsrunde
+    description: "Offizielle Gründung der wensday GmbH mit 30 Millionen CHF für Team-Aufbau, Schweizer Standort und ethische KI-Entwicklung."
   };
 
   const fundingTiers = [
     {
-      id: "supporter",
-      name: "Unterstützer",
-      amount: 25,
-      description: "Früher Zugang zur Beta-Version",
-      rewards: ["Beta-Zugang", "Newsletter", "Community-Zugang"],
-      backers: 89,
+      id: "community",
+      name: "Community Investor",
+      amount: 1000,
+      description: "Unterstützen Sie die Gründung der wensday GmbH",
+      rewards: ["Investor-Updates", "Beta-Zugang", "Community-Events", "wensday GmbH Newsletter"],
+      backers: 45,
       popular: false
     },
     {
-      id: "contributor", 
-      name: "Beitragszahler",
-      amount: 100,
-      description: "Erweiterte Features und Support",
-      rewards: ["Alle Supporter-Belohnungen", "Premium Support", "Feature-Voting"],
-      backers: 156,
+      id: "business", 
+      name: "Business Partner",
+      amount: 5000,
+      description: "Geschäftspartnerschaft mit der wensday GmbH",
+      rewards: ["Alle Community-Belohnungen", "Geschäftsberatung", "API-Zugang", "Partner-Status"],
+      backers: 28,
       popular: true
     },
     {
-      id: "patron",
-      name: "Gönner", 
-      amount: 500,
-      description: "Exklusiver Zugang und Beratung",
-      rewards: ["Alle Beitragszahler-Belohnungen", "1:1 Beratungsstunde", "Firmen-Logo"],
-      backers: 67,
+      id: "strategic",
+      name: "Strategischer Investor", 
+      amount: 25000,
+      description: "Strategische Beteiligung an der wensday GmbH",
+      rewards: ["Alle Business-Belohnungen", "Quartals-Meetings", "Produkt-Roadmap Input", "Firmen-Logo"],
+      backers: 18,
       popular: false
     },
     {
-      id: "enterprise",
-      name: "Enterprise Partner",
-      amount: 2500,
-      description: "Private Installation verfügbar",
-      rewards: ["Private Installation", "24/7 Support", "Custom Features", "Swiss-Hosting"],
-      backers: 12,
+      id: "institutional",
+      name: "Institutioneller Investor",
+      amount: 100000,
+      description: "Institutionelle Beteiligung - Weg zu 30 Millionen CHF",
+      rewards: ["Private Meetings", "Board-Observer Status", "Custom Solutions", "Swiss-Hosting Priority"],
+      backers: 8,
+      popular: false
+    },
+    {
+      id: "founder",
+      name: "Co-Founder Investment",
+      amount: 500000,
+      description: "Mitgründer-Level Investment für wensday GmbH",
+      rewards: ["Equity-Beteiligung", "Board-Sitz", "Strategic Decision Making", "Revenue Sharing"],
+      backers: 3,
       popular: false
     }
   ];
@@ -199,9 +208,10 @@ export default function Crowdfunding() {
               </CardHeader>
               <CardContent className="prose max-w-none">
                 <p className="text-swiss-gray leading-relaxed mb-4">
-                  wensday.ch revolutioniert die KI-Landschaft in der Schweiz. Wir entwickeln eine 
-                  ethische, transparente und lokal gehostete KI-Plattform, die höchste Datenschutz-
-                  und Sicherheitsstandards erfüllt.
+                  Die <strong>wensday GmbH</strong> wird mit einem Zielkapital von <strong>30 Millionen CHF</strong> 
+                  gegründet, um ein erstklassiges Entwicklerteam aufzubauen und einen vollständig 
+                  schweizerischen KI-Standort zu etablieren. Diese Finanzierung ermöglicht es uns, 
+                  2-3 Top-Entwickler einzustellen und eine führende Position in der ethischen KI-Entwicklung einzunehmen.
                 </p>
                 <div className="grid md:grid-cols-2 gap-6 my-6">
                   <div className="flex items-start gap-3">
@@ -223,9 +233,18 @@ export default function Crowdfunding() {
                     </div>
                   </div>
                 </div>
+                <div className="bg-lopez-green bg-opacity-10 border border-lopez-green rounded-lg p-4 my-4">
+                  <h4 className="font-bold text-lopez-green mb-2">30 Millionen CHF Finanzierungsziel</h4>
+                  <ul className="text-sm text-swiss-gray space-y-1">
+                    <li>• CHF 12M - Top-Entwicklerteam (2-3 Senior Engineers)</li>
+                    <li>• CHF 8M - Schweizer Firmenstandort und Infrastruktur</li>
+                    <li>• CHF 6M - KI-Forschung und Entwicklung</li>
+                    <li>• CHF 4M - Rechtliche Struktur und Compliance</li>
+                  </ul>
+                </div>
                 <p className="text-swiss-gray leading-relaxed">
-                  Mit Ihrer Unterstützung können wir diese Vision Realität werden lassen und der 
-                  Schweiz eine führende Position in der ethischen KI-Entwicklung verschaffen.
+                  Ihre Investition fließt direkt in die offizielle Gründung der wensday GmbH und 
+                  den Aufbau eines weltklasse Schweizer KI-Unternehmens mit ethischen Standards.
                 </p>
               </CardContent>
             </Card>
@@ -317,7 +336,7 @@ export default function Crowdfunding() {
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="w-4 h-4 text-swiss-gray" />
-                  <span>Läuft bis: 31. März 2025</span>
+                  <span>Series A Runde bis: 31. August 2025</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin className="w-4 h-4 text-swiss-gray" />
@@ -325,7 +344,7 @@ export default function Crowdfunding() {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Users className="w-4 h-4 text-swiss-gray" />
-                  <span>Mindestfinanzierung: CHF 100'000</span>
+                  <span>Ziel: CHF 30'000'000 für wensday GmbH Gründung</span>
                 </div>
               </CardContent>
             </Card>

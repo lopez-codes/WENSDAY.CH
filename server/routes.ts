@@ -14,6 +14,7 @@ import {
   validatePostFinanceWebhook,
   createSubscriptionLineItem
 } from "./postfinance";
+import { AIQualityController } from "./ai-quality-control";
 
 // Stripe will be configured later
 let stripe: Stripe | null = null;
@@ -107,38 +108,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Simple system - conversation title already set
 
-      // Real Gemini API call - Use either key (both should have same value)
-      const { GoogleGenAI } = await import('@google/genai');
-      
-      // Use either key - they should have the same working value
+      // Enhanced AI with Quality Control System
       const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
       if (!apiKey) {
         throw new Error('No API key configured');
       }
-      
-      const ai = new GoogleGenAI({ apiKey });
-      
-      const prompt = [...conversationHistory, { role: 'user', content: message }]
-        .map(m => `${m.role}: ${m.content}`).join('\n\n');
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: prompt,
-        config: {
-          systemInstruction: `Sie sind ein KI-Assistent von wensday.ch, einer Schweizer Plattform für professionelle KI-Forschung. Antworten Sie auf Deutsch (Schweizer Hochdeutsch) und fokussieren Sie sich auf präzise, hilfreiche Informationen.`,
-          maxOutputTokens: user.subscriptionTier === 'pro' ? 8192 : 4096,
-          temperature: 0.7,
-        },
-      });
-      
-      const aiResponse = response.text || "Entschuldigung, ich konnte keine Antwort generieren.";
 
-      // Save AI response
+      const qualityController = new AIQualityController(apiKey);
+      
+      // Build business context from user profile (handle null values)
+      const businessContext = {
+        industry: user.industry || undefined,
+        companySize: user.companySize || undefined,
+        businessGoals: (user.businessGoals as string[]) || [],
+        errorTolerance: user.errorToleranceLevel || 'medium'
+      };
+
+      // Generate business-focused response with quality analysis
+      const { content: aiContent, qualityAnalysis } = await qualityController.generateBusinessResponse(
+        message,
+        conversationHistory,
+        businessContext
+      );
+
+      // Save AI response with quality control data
       const aiMessage = await storage.createMessage({
         conversationId: conversation.id,
         role: "assistant",
-        content: aiResponse,
-        aiModel: aiModel
+        content: aiContent,
+        aiModel: aiModel,
+        hasErrors: qualityAnalysis.hasErrors,
+        errorDetails: qualityAnalysis.errorDetails,
+        confidenceScore: qualityAnalysis.confidenceScore,
+        businessCategory: qualityAnalysis.businessCategory,
+        needsReview: qualityAnalysis.needsReview,
+        factChecked: qualityAnalysis.factChecked,
+        sources: qualityAnalysis.sources
       });
 
       // Increment user's daily message count
@@ -455,6 +460,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("PostFinance webhook error:", error);
       res.status(500).json({ message: "Webhook processing failed" });
+    }
+  });
+
+  // Business Analytics API for Dashboard
+  app.get('/api/business/analytics', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get user's messages for analytics
+      const userConversations = await storage.getUserConversations(userId);
+      const conversationIds = userConversations.map(c => c.id);
+      
+      if (conversationIds.length === 0) {
+        return res.json({
+          averageConfidence: 85,
+          verifiedResponses: 0,
+          needsReview: 0,
+          errorsDetected: 0,
+          totalMessages: 0
+        });
+      }
+
+      // Get all messages for analytics (simplified for now)
+      const allMessages = await Promise.all(
+        conversationIds.map(id => storage.getConversationMessages(id))
+      );
+      
+      const flatMessages = allMessages.flat().filter(m => m.role === 'assistant');
+      
+      const analytics = {
+        averageConfidence: Math.round(
+          flatMessages.reduce((sum, msg) => sum + ((msg as any).confidenceScore || 75), 0) / 
+          Math.max(flatMessages.length, 1)
+        ),
+        verifiedResponses: flatMessages.filter(m => (m as any).factChecked).length,
+        needsReview: flatMessages.filter(m => (m as any).needsReview).length,
+        errorsDetected: flatMessages.filter(m => (m as any).hasErrors).length,
+        totalMessages: flatMessages.length
+      };
+      
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching business analytics:", error);
+      res.status(500).json({ message: "Failed to fetch analytics" });
     }
   });
 

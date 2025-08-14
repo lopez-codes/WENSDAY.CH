@@ -1,21 +1,30 @@
 # Overview
 
-This is a Swiss AI chat platform called "wensday.ch" that provides professional research capabilities through multiple AI models. The application is built as a full-stack web platform with a React frontend and Express.js backend, featuring subscription-based access tiers, chat functionality with conversation history, and integration with external services like Google's Gemini AI and Stripe for payments.
+wensday.ch is a **Business-focused AI MVP platform** designed for Swiss companies, strategically positioned for future deployment as Flutter mobile apps (Android/iOS) with Firebase backend. The platform provides professional AI assistance with advanced quality control systems similar to ChatGPT's error detection capabilities, targeting business use cases with enhanced reliability and verification features.
 
 ## Version History
 
+### v2 - Business MVP with AI Quality Control (August 14, 2025) 🔄
+**BUSINESS TRANSFORMATION IN PROGRESS**
+- ✅ Business-focused schema enhancements (industry, company data, error tolerance)
+- ✅ AI Quality Control System (error detection, confidence scoring, fact checking)
+- ✅ Business Dashboard with analytics and quality metrics
+- ✅ Enhanced message schema with business categories and verification flags
+- ✅ Business context-aware AI responses (industry-specific, Swiss market focus)
+- ✅ Dual-mode interface: Business Dashboard + Traditional Chat
+- ✅ Firebase migration preparation fields in user schema
+- 🔄 Quality indicators in chat interface for real-time error detection
+- 🔄 Business analytics API for dashboard metrics
+
 ### v1 - Working Swiss AI Chat Platform (August 8, 2025) ✅
-**FULLY FUNCTIONAL - BACKUP POINT**
+**STABLE FOUNDATION - BACKUP POINT**
 - ✅ Real Gemini API responses working with valid GEMINI_API_KEY
 - ✅ Chat delete functionality implemented and tested
 - ✅ Swiss German AI assistant responding correctly
 - ✅ Rate limits: 10 free messages/day, 500 ultra, unlimited pro
 - ✅ Conversation history saved and loadable
-- ✅ Simple, reliable chat interface (like 07.08 working version)
+- ✅ Simple, reliable chat interface
 - ✅ PostFinance payment integration ready
-- ✅ Database cleaned (removed problematic chats after 07.08)
-- ✅ Both GEMINI_API_KEY and GOOGLE_API_KEY with same working value
-- ✅ No 500 errors, stable API responses
 - ✅ Authentication with Replit OpenID working
 - ✅ User profile, subscription tiers, message limits all functional
 

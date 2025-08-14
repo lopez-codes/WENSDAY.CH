@@ -23,7 +23,7 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
-// User storage table
+// User storage table - Enhanced for business users
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
@@ -40,26 +40,53 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").default(false), // admin permissions
   dailyMessageCount: integer("daily_message_count").default(0),
   lastMessageDate: timestamp("last_message_date"),
+  // Business Enhancement Fields
+  companyName: varchar("company_name"), // Business company
+  jobTitle: varchar("job_title"), // User's position
+  industry: varchar("industry"), // Business industry
+  companySize: varchar("company_size"), // "startup", "sme", "enterprise"
+  businessGoals: jsonb("business_goals"), // Primary business objectives
+  qualitySettings: jsonb("quality_settings"), // AI quality preferences
+  errorToleranceLevel: varchar("error_tolerance_level").default("medium"), // "low", "medium", "high"
+  // Firebase Migration Preparation
+  firebaseUid: varchar("firebase_uid"), // Future Firebase user ID
+  migrationStatus: varchar("migration_status").default("pending"), // Migration tracking
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Conversations table
+// Conversations table - Enhanced for business workflows
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
   title: varchar("title").notNull(),
+  // Business Enhancement Fields
+  businessType: varchar("business_type"), // "analysis", "strategy", "research", "planning"
+  priority: varchar("priority").default("medium"), // "low", "medium", "high", "urgent"
+  isArchived: boolean("is_archived").default(false),
+  collaborators: jsonb("collaborators"), // Future: team collaboration
+  tags: jsonb("tags"), // Business tags for organization
+  projectId: varchar("project_id"), // Future: link to business projects
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Messages table
+// Messages table - Enhanced for business use and error detection
 export const messages = pgTable("messages", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   conversationId: varchar("conversation_id").notNull().references(() => conversations.id, { onDelete: 'cascade' }),
   role: varchar("role").notNull(), // user, assistant
   content: text("content").notNull(),
   aiModel: varchar("ai_model"), // gemini-2.5-flash, gemini-2.5-pro
+  // Business & Quality Control Features
+  hasErrors: boolean("has_errors").default(false), // AI error detection
+  errorDetails: text("error_details"), // Specific error descriptions
+  confidenceScore: integer("confidence_score"), // 0-100 confidence in response
+  businessCategory: varchar("business_category"), // e.g., "finance", "marketing", "legal"
+  isVerified: boolean("is_verified").default(false), // Manual verification by user
+  needsReview: boolean("needs_review").default(false), // Flagged for human review
+  factChecked: boolean("fact_checked").default(false), // Automated fact checking
+  sources: jsonb("sources"), // Referenced sources for business claims
   createdAt: timestamp("created_at").defaultNow(),
 });
 

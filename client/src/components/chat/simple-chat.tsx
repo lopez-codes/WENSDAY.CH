@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Bot, User, Send, Trash2 } from "lucide-react";
+import QualityIndicator from "@/components/business/quality-indicator";
 import type { Message, Conversation } from "@shared/schema";
 
 interface SimpleChatProps {
@@ -146,6 +147,20 @@ export default function SimpleChat({
                 : "bg-gray-50 dark:bg-gray-800"
             }`}>
               <div className="text-sm whitespace-pre-wrap">{msg.content}</div>
+              
+              {/* Quality Control for AI Messages */}
+              {msg.role === "assistant" && (msg as any).confidenceScore && (
+                <div className="mt-2 pt-2 border-t border-gray-200">
+                  <QualityIndicator
+                    hasErrors={(msg as any).hasErrors}
+                    confidenceScore={(msg as any).confidenceScore}
+                    needsReview={(msg as any).needsReview}
+                    factChecked={(msg as any).factChecked}
+                    errorDetails={(msg as any).errorDetails}
+                    businessCategory={(msg as any).businessCategory}
+                  />
+                </div>
+              )}
             </Card>
 
             {msg.role === "user" && (

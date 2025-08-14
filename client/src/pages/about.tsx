@@ -13,11 +13,14 @@ export default function About() {
         {/* Hero Section */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Über wensday GmbH
+            Über Lopez Codes
           </h1>
           <p className="text-xl text-swiss-gray max-w-3xl mx-auto">
             Schweizer KI-Innovation für ethische und nachhaltige Technologie-Lösungen
           </p>
+          <div className="mt-4 text-sm text-swiss-gray">
+            <p>CHE-316.025.450 • Einzelunternehmen • Eingetragen im Handelsregister Bern</p>
+          </div>
         </div>
 
         {/* Company Overview */}
@@ -30,12 +33,18 @@ export default function About() {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-swiss-gray">
-              wensday GmbH entwickelt ethische KI-Lösungen für Schweizer Unternehmen und internationale Märkte. 
-              Unser Fokus liegt auf Datenschutz, Transparenz und nachhaltiger Innovation.
+              Lopez Codes ist ein im Handelsregister eingetragenes Schweizer Einzelunternehmen, das sich auf 
+              Forschung und Entwicklung im Bereich der künstlichen Intelligenz (KI), des maschinellen Lernens 
+              und der Computer Vision spezialisiert hat.
             </p>
             <p className="text-swiss-gray">
-              Mit Sitz in der Schweiz profitieren wir von strengen Datenschutzgesetzen und einer stabilen 
-              Rechtsordnung, die unseren Kunden höchste Sicherheit garantiert.
+              Unser Fokus liegt auf der Bereitstellung von Lösungen im Bereich des Cloud Computing, der 
+              Webentwicklung sowie der Integration und Modernisierung von IT-Systemen. Wir bieten zudem 
+              Beratungs- und Schulungsdienstleistungen in diesen Bereichen an.
+            </p>
+            <p className="text-swiss-gray">
+              Mit Sitz in Münsingen, Kanton Bern, profitieren wir von strengen Schweizer Datenschutzgesetzen 
+              und einer stabilen Rechtsordnung, die unseren Kunden höchste Sicherheit garantiert.
             </p>
           </CardContent>
         </Card>
@@ -50,8 +59,8 @@ export default function About() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-swiss-gray">Zürich, Schweiz</p>
-              <p className="text-sm text-swiss-gray">Swiss-hosted Infrastructure</p>
+              <p className="text-swiss-gray">Münsingen, Bern</p>
+              <p className="text-sm text-swiss-gray">Tägertschistrasse 5, 3110 Münsingen</p>
             </CardContent>
           </Card>
 
@@ -77,7 +86,7 @@ export default function About() {
             </CardHeader>
             <CardContent>
               <p className="text-swiss-gray">GDPR & Swiss DSG</p>
-              <p className="text-sm text-swiss-gray">Vollständige Rechtskonformität</p>
+              <p className="text-sm text-swiss-gray">UID: CHE-316.025.450</p>
             </CardContent>
           </Card>
         </div>
@@ -167,18 +176,18 @@ export default function About() {
               <div>
                 <h4 className="font-semibold mb-2">Geschäftsadresse</h4>
                 <p className="text-sm text-swiss-gray">
-                  wensday GmbH<br />
-                  Bahnhofstrasse 1<br />
-                  8001 Zürich<br />
+                  Lopez Codes<br />
+                  Tägertschistrasse 5<br />
+                  3110 Münsingen<br />
                   Schweiz
                 </p>
               </div>
               <div>
                 <h4 className="font-semibold mb-2">Kontakt</h4>
                 <p className="text-sm text-swiss-gray">
-                  E-Mail: info@wensday.ch<br />
-                  Telefon: +41 44 XXX XX XX<br />
-                  Handelsregister: CHE-XXX.XXX.XXX
+                  E-Mail: info@lopez.codes<br />
+                  Web: https://lopez.codes<br />
+                  UID: CHE-316.025.450
                 </p>
               </div>
             </div>

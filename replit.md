@@ -1,6 +1,13 @@
 # Overview
 
-wensday.ch is a **Business-focused AI MVP platform** designed for Swiss companies, strategically positioned for future deployment as Flutter mobile apps (Android/iOS) with Firebase backend. The platform provides professional AI assistance with advanced quality control systems similar to ChatGPT's error detection capabilities, targeting business use cases with enhanced reliability and verification features.
+wensday.ch is a **Business-focused AI MVP platform** developed by Lopez Codes (CHE-316.025.450), a Swiss AI research and development company. The platform is designed for Swiss companies, strategically positioned for future deployment as Flutter mobile apps (Android/iOS) with Firebase backend. The platform provides professional AI assistance with advanced quality control systems similar to ChatGPT's error detection capabilities, targeting business use cases with enhanced reliability and verification features.
+
+## Company Information
+- **Legal Entity**: Lopez Codes, Einzelunternehmen
+- **UID**: CHE-316.025.450 
+- **Address**: Tägertschistrasse 5, 3110 Münsingen, Switzerland
+- **Registration**: Handelsregister Bern (active since September 2024)
+- **Purpose**: AI research & development, machine learning, computer vision, data processing & optimization, cloud computing, web development, IT system integration & modernization, consulting & training services
 
 ## Version History
 

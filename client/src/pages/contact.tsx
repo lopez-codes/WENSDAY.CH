@@ -49,7 +49,7 @@ export default function Contact() {
             Kontakt & Support
           </h1>
           <p className="text-xl text-swiss-gray max-w-3xl mx-auto">
-            Haben Sie Fragen zu wensday? Wir helfen Ihnen gerne weiter.
+            Haben Sie Fragen zu unseren KI-Lösungen? Wir helfen Ihnen gerne weiter.
           </p>
         </div>
 
@@ -164,10 +164,11 @@ export default function Contact() {
                   <div>
                     <h4 className="font-semibold">Geschäftsadresse</h4>
                     <p className="text-sm text-swiss-gray">
-                      wensday GmbH<br />
-                      Bahnhofstrasse 1<br />
-                      8001 Zürich<br />
-                      Schweiz
+                      Lopez Codes<br />
+                      Tägertschistrasse 5<br />
+                      3110 Münsingen<br />
+                      Schweiz<br />
+                      <span className="text-xs font-mono">UID: CHE-316.025.450</span>
                     </p>
                   </div>
                 </div>
@@ -176,8 +177,8 @@ export default function Contact() {
                   <Mail className="w-5 h-5 text-lopez-green mt-1" />
                   <div>
                     <h4 className="font-semibold">E-Mail</h4>
-                    <p className="text-sm text-swiss-gray">info@wensday.ch</p>
-                    <p className="text-sm text-swiss-gray">support@wensday.ch</p>
+                    <p className="text-sm text-swiss-gray">info@lopez.codes</p>
+                    <p className="text-sm text-swiss-gray">contact@lopez.codes</p>
                   </div>
                 </div>
 

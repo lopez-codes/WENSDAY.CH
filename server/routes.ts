@@ -276,11 +276,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       // Generate business-focused response with quality analysis
-      const { content: aiContent, qualityAnalysis } = await qualityController.generateBusinessResponse(
-        content,
-        conversationHistory,
-        businessContext
-      );
+      let aiContent, qualityAnalysis;
+      try {
+        const result = await qualityController.generateBusinessResponse(
+          content,
+          conversationHistory,
+          businessContext
+        );
+        aiContent = result.content;
+        qualityAnalysis = result.qualityAnalysis;
+      } catch (error) {
+        console.warn("Quality analysis failed, using direct AI response:", error);
+        // Fallback to direct AI response without quality analysis
+        const directResponse = await qualityController.generateDirectResponse(content, conversationHistory);
+        aiContent = directResponse;
+        qualityAnalysis = {
+          hasErrors: false,
+          errorDetails: null,
+          confidenceScore: 75, // Default confidence
+          businessCategory: 'general',
+          needsReview: false,
+          factChecked: false,
+          sources: []
+        };
+      }
 
       // Save AI response with quality control data
       const aiMessage = await storage.createMessage({

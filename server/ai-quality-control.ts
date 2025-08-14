@@ -121,6 +121,35 @@ Antworte mit JSON in folgendem Format:
   }
 
   /**
+   * Direct AI response generation without quality analysis
+   */
+  async generateDirectResponse(
+    userMessage: string,
+    conversationHistory: Array<{ role: string; content: string }>
+  ): Promise<string> {
+    try {
+      const prompt = `Du bist ein hilfreicher AI-Assistent. Beantworte die Frage des Benutzers hilfreich und präzise.
+
+Gesprächsverlauf:
+${conversationHistory.map(msg => `${msg.role === 'user' ? 'Benutzer' : 'Assistent'}: ${msg.content}`).join('\n')}
+
+Aktuelle Frage: ${userMessage}
+
+Antworte freundlich und hilfreich auf Deutsch:`;
+
+      const response = await this.ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: prompt,
+      });
+
+      return response.text || "Entschuldigung, ich konnte keine Antwort generieren.";
+    } catch (error) {
+      console.error("Direct AI response failed:", error);
+      return "Entschuldigung, es gab ein Problem bei der Antwortgenerierung. Bitte versuchen Sie es erneut.";
+    }
+  }
+
+  /**
    * Enhanced business-focused AI response generation
    */
   async generateBusinessResponse(

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import Landing from "@/pages/landing";
 import Home from "@/pages/home";
+import Ecosystem from "@/pages/ecosystem";
 import SettingsPage from "@/pages/settings";
 import Subscribe from "@/pages/subscribe";
 import PostFinanceSubscribe from "@/pages/postfinance-subscribe";
@@ -26,6 +27,7 @@ function Router() {
       ) : (
         <>
           <Route path="/" component={Home} />
+          <Route path="/ecosystem" component={Ecosystem} />
           <Route path="/settings" component={SettingsPage} />
           <Route path="/subscribe" component={Subscribe} />
           <Route path="/postfinance-subscribe" component={PostFinanceSubscribe} />

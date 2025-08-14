@@ -36,23 +36,17 @@ export default function Header() {
           <nav className="hidden md:flex items-center space-x-6">
             {!isAuthenticated && (
               <>
-                <button 
-                  onClick={() => scrollToSection('features')}
-                  className="text-swiss-gray hover:text-lopez-green transition-colors"
-                >
-                  Features
-                </button>
+                <Link href="/ecosystem" className="text-swiss-gray hover:text-lopez-green transition-colors">
+                  AI-Ökosystem
+                </Link>
+                <Link href="/styles-overview" className="text-swiss-gray hover:text-lopez-green transition-colors">
+                  Styles
+                </Link>
                 <button 
                   onClick={() => scrollToSection('pricing')}
                   className="text-swiss-gray hover:text-lopez-green transition-colors"
                 >
                   Pricing
-                </button>
-                <button 
-                  onClick={() => scrollToSection('partners')}
-                  className="text-swiss-gray hover:text-lopez-green transition-colors"
-                >
-                  Partners
                 </button>
               </>
             )}

@@ -24,6 +24,7 @@ function Router() {
         <>
           <Route path="/" component={Landing} />
           <Route path="/ecosystem" component={Ecosystem} />
+          <Route path="/styles-overview" component={StylesOverview} />
           <Route path="/subscribe" component={Subscribe} />
         </>
       ) : (

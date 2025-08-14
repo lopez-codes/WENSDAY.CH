@@ -30,7 +30,7 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
-  subscriptionTier: varchar("subscription_tier").default("free"), // free, ultra, pro
+  subscriptionTier: varchar("subscription_tier").default("free"), // free, ultra, pro, wensday_core
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   postfinanceSubscriptionId: integer("postfinance_subscription_id"),
@@ -48,6 +48,16 @@ export const users = pgTable("users", {
   businessGoals: jsonb("business_goals"), // Primary business objectives
   qualitySettings: jsonb("quality_settings"), // AI quality preferences
   errorToleranceLevel: varchar("error_tolerance_level").default("medium"), // "low", "medium", "high"
+  
+  // wensday-core exclusive features (Premium Developer Access)
+  hasCoreAccess: boolean("has_core_access").default(false),
+  coreApiKey: varchar("core_api_key"), // Personal API key for direct integrations
+  unlimitedAccess: boolean("unlimited_access").default(false),
+  directKiIntegration: boolean("direct_ki_integration").default(false),
+  fullControlMode: boolean("full_control_mode").default(false),
+  coreConnectors: jsonb("core_connectors"), // Custom connector configurations
+  developerResponsibility: boolean("developer_responsibility").default(false), // User takes full responsibility
+  
   // Firebase Migration Preparation
   firebaseUid: varchar("firebase_uid"), // Future Firebase user ID
   migrationStatus: varchar("migration_status").default("pending"), // Migration tracking

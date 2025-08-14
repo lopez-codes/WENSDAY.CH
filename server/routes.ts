@@ -15,6 +15,7 @@ import {
   createSubscriptionLineItem
 } from "./postfinance";
 import { AIQualityController } from "./ai-quality-control";
+import { WensdayCore } from "./wensday-core";
 
 // Stripe will be configured later
 let stripe: Stripe | null = null;
@@ -29,6 +30,7 @@ const RATE_LIMITS = {
   free: 10,
   ultra: 500,
   pro: -1, // unlimited
+  wensday_core: -1, // unlimited + direct access
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -725,6 +727,176 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error fetching crowdfunding stats:', error);
       res.status(500).json({ message: 'Failed to fetch campaign stats' });
+    }
+  });
+
+  // wensday-core exclusive routes (Premium Developer Access)
+  app.post('/api/core/access', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.subscriptionTier !== 'wensday_core') {
+        return res.status(403).json({ 
+          error: "wensday-core access requires premium developer subscription" 
+        });
+      }
+
+      // Generate API key if not exists
+      if (!user.coreApiKey) {
+        const apiKey = WensdayCore.generateCoreApiKey(userId);
+        await storage.updateUser(userId, { 
+          coreApiKey: apiKey,
+          hasCoreAccess: true,
+          unlimitedAccess: true,
+          directKiIntegration: true,
+          fullControlMode: true,
+          developerResponsibility: true
+        });
+        
+        return res.json({
+          message: "wensday-core access activated",
+          apiKey: apiKey,
+          features: {
+            unlimited_access: true,
+            direct_ki_integration: true,
+            full_control_mode: true,
+            custom_connectors: true,
+            raw_model_access: true
+          },
+          responsibility_notice: "You have full control and responsibility for all AI interactions"
+        });
+      }
+
+      res.json({
+        status: "active",
+        features: {
+          unlimited_access: user.unlimitedAccess,
+          direct_ki_integration: user.directKiIntegration,
+          full_control_mode: user.fullControlMode,
+          has_api_key: !!user.coreApiKey
+        }
+      });
+    } catch (error) {
+      console.error("wensday-core access error:", error);
+      res.status(500).json({ error: "Failed to manage core access" });
+    }
+  });
+
+  app.post('/api/core/direct-ai', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.hasCoreAccess || user.subscriptionTier !== 'wensday_core') {
+        return res.status(403).json({ error: "Requires wensday-core access" });
+      }
+
+      const { prompt, model } = req.body;
+      
+      const coreConfig = {
+        userId,
+        apiKey: user.coreApiKey!,
+        unlimitedAccess: user.unlimitedAccess!,
+        fullControlMode: user.fullControlMode!,
+        directIntegration: user.directKiIntegration!,
+        connectors: (user.coreConnectors as any[]) || []
+      };
+
+      const core = new WensdayCore(coreConfig);
+      const result = await core.directAiQuery(prompt, model);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Direct AI error:", error);
+      res.status(500).json({ error: "Direct AI query failed" });
+    }
+  });
+
+  app.post('/api/core/batch', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.hasCoreAccess || !user.unlimitedAccess) {
+        return res.status(403).json({ error: "Requires unlimited access" });
+      }
+
+      const { requests } = req.body;
+      
+      const coreConfig = {
+        userId,
+        apiKey: user.coreApiKey!,
+        unlimitedAccess: true,
+        fullControlMode: user.fullControlMode!,
+        directIntegration: user.directKiIntegration!,
+        connectors: (user.coreConnectors as any[]) || []
+      };
+
+      const core = new WensdayCore(coreConfig);
+      const results = await core.batchProcess(requests);
+      
+      res.json({ results });
+    } catch (error) {
+      console.error("Batch processing error:", error);
+      res.status(500).json({ error: "Batch processing failed" });
+    }
+  });
+
+  app.post('/api/core/connector/:name', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const connectorName = req.params.name;
+      
+      if (!user?.hasCoreAccess || !user.directKiIntegration) {
+        return res.status(403).json({ error: "Requires direct integration access" });
+      }
+
+      const coreConfig = {
+        userId,
+        apiKey: user.coreApiKey!,
+        unlimitedAccess: user.unlimitedAccess!,
+        fullControlMode: user.fullControlMode!,
+        directIntegration: true,
+        connectors: (user.coreConnectors as any[]) || []
+      };
+
+      const core = new WensdayCore(coreConfig);
+      const result = await core.executeConnector(connectorName, req.body);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Connector execution error:", error);
+      res.status(500).json({ error: "Connector execution failed" });
+    }
+  });
+
+  app.post('/api/core/raw-model', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.hasCoreAccess || !user.fullControlMode) {
+        return res.status(403).json({ error: "Requires full control mode" });
+      }
+
+      const coreConfig = {
+        userId,
+        apiKey: user.coreApiKey!,
+        unlimitedAccess: user.unlimitedAccess!,
+        fullControlMode: true,
+        directIntegration: user.directKiIntegration!,
+        connectors: (user.coreConnectors as any[]) || []
+      };
+
+      const core = new WensdayCore(coreConfig);
+      const result = await core.rawModelAccess(req.body);
+      
+      res.json(result);
+    } catch (error) {
+      console.error("Raw model access error:", error);
+      res.status(500).json({ error: "Raw model access failed" });
     }
   });
 

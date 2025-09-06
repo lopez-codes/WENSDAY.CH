@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertCircle, Users, Activity, Shield, Settings, Eye, Edit, Trash2, Crown } from "lucide-react";
+import { AlertCircle, Users, Activity, Shield, Settings, Eye, Edit, Trash2, Crown, Brain, Plus, Key } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +31,25 @@ interface AdminLog {
   targetUserId: string | null;
   details: any;
   createdAt: string;
+}
+
+interface AiProvider {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  baseUrl: string;
+  apiKeyName: string;
+  isActive: boolean;
+  supportedModels: any;
+  defaultModel: string;
+  pricing?: any;
+  rateLimit?: any;
+  features?: any;
+  adminOnly: boolean;
+  requiresApproval: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function AdminDashboard() {
@@ -72,6 +91,12 @@ export default function AdminDashboard() {
     enabled: !!(user as any)?.isAdmin,
   });
 
+  // AI Providers queries
+  const { data: providers = [], isLoading: providersLoading } = useQuery<AiProvider[]>({
+    queryKey: ["/api/admin/ai-providers"],
+    enabled: !!(user as any)?.isAdmin,
+  });
+
   // Mutations
   const updateUserMutation = useMutation({
     mutationFn: ({ userId, updates }: { userId: string; updates: any }) =>
@@ -90,6 +115,29 @@ export default function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+    },
+  });
+
+  // AI Provider mutations
+  const initDefaultProvidersMutation = useMutation({
+    mutationFn: () => apiRequest("/api/admin/init-default-providers", "POST", {}),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ai-providers"] });
+    },
+  });
+
+  const updateProviderMutation = useMutation({
+    mutationFn: ({ providerId, updates }: { providerId: string; updates: any }) =>
+      apiRequest(`/api/admin/ai-providers/${providerId}`, "PUT", updates),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ai-providers"] });
+    },
+  });
+
+  const deleteProviderMutation = useMutation({
+    mutationFn: (providerId: string) => apiRequest(`/api/admin/ai-providers/${providerId}`, "DELETE"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/ai-providers"] });
     },
   });
 
@@ -143,7 +191,7 @@ export default function AdminDashboard() {
         </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Übersicht
@@ -151,6 +199,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Benutzer
+          </TabsTrigger>
+          <TabsTrigger value="providers" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            KI-Provider
           </TabsTrigger>
           <TabsTrigger value="core" className="flex items-center gap-2">
             <Shield className="h-4 w-4" />
@@ -322,6 +374,135 @@ export default function AdminDashboard() {
                         </TableCell>
                       </TableRow>
                     ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="providers" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">KI-Provider Management</h2>
+              <p className="text-muted-foreground">
+                OpenAI, Claude, Perplexity, Microsoft und weitere AI-Anbieter verwalten
+              </p>
+            </div>
+            <Button
+              onClick={() => initDefaultProvidersMutation.mutate()}
+              disabled={initDefaultProvidersMutation.isPending}
+              className="flex items-center gap-2"
+              data-testid="button-init-providers"
+            >
+              <Plus className="h-4 w-4" />
+              {initDefaultProvidersMutation.isPending ? "Installiere..." : "Standard-Provider installieren"}
+            </Button>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Verfügbare AI-Provider</CardTitle>
+              <CardDescription>
+                Konfigurierte KI-Anbieter und deren Status verwalten
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {providersLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-muted-foreground">Lade Provider...</div>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Provider</TableHead>
+                      <TableHead>Modelle</TableHead>
+                      <TableHead>API Key</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Zugriffsebene</TableHead>
+                      <TableHead>Aktionen</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {providers.map((provider: AiProvider) => (
+                      <TableRow key={provider.id} data-testid={`row-provider-${provider.slug}`}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{provider.name}</div>
+                            <div className="text-sm text-muted-foreground">
+                              {provider.description}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {provider.supportedModels ? provider.supportedModels.length : 0} Modelle
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Standard: {provider.defaultModel}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Key className="h-3 w-3 text-muted-foreground" />
+                            <span className="text-xs font-mono">{provider.apiKeyName}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={provider.isActive ? "default" : "outline"}>
+                            {provider.isActive ? "Aktiv" : "Inaktiv"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col gap-1">
+                            {provider.adminOnly && (
+                              <Badge variant="destructive" className="text-xs">Admin Only</Badge>
+                            )}
+                            {provider.requiresApproval && (
+                              <Badge variant="outline" className="text-xs">Genehmigung erforderlich</Badge>
+                            )}
+                            {!provider.adminOnly && !provider.requiresApproval && (
+                              <Badge variant="secondary" className="text-xs">Öffentlich</Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                updateProviderMutation.mutate({
+                                  providerId: provider.id,
+                                  updates: { isActive: !provider.isActive },
+                                })
+                              }
+                              disabled={updateProviderMutation.isPending}
+                              data-testid={`button-toggle-${provider.slug}`}
+                            >
+                              {provider.isActive ? "Deaktivieren" : "Aktivieren"}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => deleteProviderMutation.mutate(provider.id)}
+                              disabled={deleteProviderMutation.isPending}
+                              data-testid={`button-delete-${provider.slug}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {providers.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                          Keine Provider konfiguriert. Klicken Sie "Standard-Provider installieren" um zu beginnen.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               )}

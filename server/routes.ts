@@ -936,18 +936,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       try {
-        const aiResponse = await qualityController.generateResponse(
-          conversationHistory,
-          guestContext,
-          'gemini-2.5-flash'
+        const aiResponse = await qualityController.generateDirectResponse(
+          message,
+          conversationHistory
         );
 
         // Return response without saving to database
         res.json({
           success: true,
-          response: aiResponse.content,
-          hasErrors: aiResponse.hasErrors || false,
-          confidenceScore: aiResponse.confidenceScore || 85,
+          response: aiResponse,
+          hasErrors: false,
+          confidenceScore: 85,
           isGuest: true,
           message: "Free Chat - Anmelden für erweiterte Funktionen"
         });

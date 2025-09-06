@@ -30,23 +30,27 @@ import { useToast } from "@/hooks/use-toast";
 import type { Message, Conversation } from "@shared/schema";
 
 export default function Chat() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Guest chat state
+  const [guestMessages, setGuestMessages] = useState<Array<{role: string, content: string, timestamp: Date}>>([]);
 
-  // Fetch conversations
+  // Fetch conversations (only for authenticated users)
   const { data: conversations = [] } = useQuery({
     queryKey: ["/api/conversations"],
+    enabled: isAuthenticated,
   }) as { data: Conversation[] };
 
-  // Fetch messages for selected conversation  
+  // Fetch messages for selected conversation (only for authenticated users)
   const { data: messages = [] } = useQuery({
     queryKey: ["/api/conversations", selectedConversationId, "messages"],
-    enabled: !!selectedConversationId,
+    enabled: !!selectedConversationId && isAuthenticated,
   }) as { data: Message[] };
 
   // Create new conversation
@@ -94,6 +98,43 @@ export default function Chat() {
     },
   });
 
+  // Guest chat mutation (for unauthenticated users)
+  const guestChatMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const response = await fetch('/api/chat/free', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: content }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Add AI response to guest messages
+      setGuestMessages(prev => [...prev, {
+        role: 'assistant',
+        content: data.response,
+        timestamp: new Date()
+      }]);
+      setNewMessage("");
+      setIsGenerating(false);
+    },
+    onError: () => {
+      setIsGenerating(false);
+      toast({
+        title: "Fehler",
+        description: "Nachricht konnte nicht gesendet werden.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete conversation
   const deleteConversationMutation = useMutation({
     mutationFn: async (conversationId: string) => {
@@ -110,7 +151,7 @@ export default function Chat() {
   // Auto-scroll to bottom
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, guestMessages]);
 
   // Auto-select first conversation
   useEffect(() => {
@@ -121,6 +162,19 @@ export default function Chat() {
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || isGenerating) return;
+    
+    if (!isAuthenticated) {
+      // Guest mode - use free chat
+      setIsGenerating(true);
+      // Add user message to guest messages
+      setGuestMessages(prev => [...prev, {
+        role: 'user',
+        content: newMessage.trim(),
+        timestamp: new Date()
+      }]);
+      guestChatMutation.mutate(newMessage.trim());
+      return;
+    }
     
     if (!selectedConversationId) {
       // Create new conversation first
@@ -155,19 +209,32 @@ export default function Chat() {
       <div className="w-80 bg-gray-50 border-r border-gray-200 flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
-          <Button
-            onClick={() => createConversationMutation.mutate()}
-            className="w-full justify-start gap-2 bg-lopez-green hover:bg-lopez-green-dark"
-            disabled={createConversationMutation.isPending}
-          >
-            <PlusCircle className="w-4 h-4" />
-            Neues Gespräch
-          </Button>
+          {isAuthenticated ? (
+            <Button
+              onClick={() => createConversationMutation.mutate()}
+              className="w-full justify-start gap-2 bg-lopez-green hover:bg-lopez-green-dark"
+              disabled={createConversationMutation.isPending}
+            >
+              <PlusCircle className="w-4 h-4" />
+              Neues Gespräch
+            </Button>
+          ) : (
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Free Chat</h3>
+              <Button 
+                onClick={() => window.location.href = '/api/login'}
+                className="w-full bg-lopez-green hover:bg-lopez-green-dark"
+              >
+                Anmelden für mehr Features
+              </Button>
+            </div>
+          )}
         </div>
 
-        {/* Conversations List */}
-        <ScrollArea className="flex-1 p-2">
-          {conversations.map((conversation: Conversation) => (
+        {/* Conversations List (only for authenticated users) */}
+        {isAuthenticated && (
+          <ScrollArea className="flex-1 p-2">
+            {conversations.map((conversation: Conversation) => (
             <div
               key={conversation.id}
               className={`group p-3 rounded-lg cursor-pointer mb-1 transition-colors ${
@@ -217,7 +284,8 @@ export default function Chat() {
               </div>
             </div>
           ))}
-        </ScrollArea>
+          </ScrollArea>
+        )}
 
         {/* User Info */}
         <div className="p-4 border-t border-gray-200">
@@ -253,14 +321,21 @@ export default function Chat() {
 
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
-        {selectedConversationId ? (
+        {(isAuthenticated && selectedConversationId) || !isAuthenticated ? (
           <>
             {/* Messages */}
             <ScrollArea className="flex-1 p-6">
               <div className="max-w-3xl mx-auto space-y-6">
-                {messages.map((message: Message) => (
+                {!isAuthenticated && (
+                  <div className="text-center py-4 border-b border-gray-200 mb-6">
+                    <h2 className="text-lg font-semibold text-gray-900">Free Chat</h2>
+                    <p className="text-sm text-gray-600">Anmelden für erweiterte Funktionen und Gesprächsspeicher</p>
+                  </div>
+                )}
+                
+                {(isAuthenticated ? messages : guestMessages).map((message: any, index: number) => (
                   <div
-                    key={message.id}
+                    key={message.id || index}
                     className={`flex gap-4 ${
                       message.role === 'user' ? 'justify-end' : 'justify-start'
                     }`}

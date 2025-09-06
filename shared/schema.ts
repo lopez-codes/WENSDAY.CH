@@ -71,6 +71,40 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// AI Providers table - Admin management of AI providers and models
+export const aiProviders = pgTable("ai_providers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(), // "OpenAI", "Anthropic", "Google", "Microsoft", "Perplexity", etc.
+  slug: varchar("slug").notNull().unique(), // "openai", "anthropic", "google", etc.
+  description: text("description"),
+  baseUrl: varchar("base_url").notNull(), // API base URL
+  apiKeyName: varchar("api_key_name").notNull(), // Environment variable name for API key
+  isActive: boolean("is_active").default(true),
+  supportedModels: jsonb("supported_models").notNull(), // Array of model objects
+  defaultModel: varchar("default_model"), // Default model for this provider
+  pricing: jsonb("pricing"), // Pricing information per model
+  rateLimit: jsonb("rate_limit"), // Rate limiting configuration
+  features: jsonb("features"), // Supported features (streaming, vision, etc.)
+  adminOnly: boolean("admin_only").default(false), // Only admins can use this provider
+  requiresApproval: boolean("requires_approval").default(false), // Requires admin approval to use
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// AI Provider Configurations - User-specific provider settings
+export const userProviderConfigs = pgTable("user_provider_configs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id),
+  providerId: varchar("provider_id").references(() => aiProviders.id),
+  isEnabled: boolean("is_enabled").default(true),
+  preferredModel: varchar("preferred_model"),
+  customSettings: jsonb("custom_settings"), // User-specific provider settings
+  usage: jsonb("usage"), // Usage statistics
+  lastUsed: timestamp("last_used"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Conversations table - Enhanced for business workflows
 export const conversations = pgTable("conversations", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -156,6 +190,18 @@ export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit
   updatedAt: true,
 });
 
+export const insertAiProviderSchema = createInsertSchema(aiProviders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserProviderConfigSchema = createInsertSchema(userProviderConfigs).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -163,7 +209,11 @@ export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
 export type AdminLog = typeof adminLogs.$inferSelect;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+export type AiProvider = typeof aiProviders.$inferSelect;
+export type UserProviderConfig = typeof userProviderConfigs.$inferSelect;
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type InsertAdminLog = z.infer<typeof insertAdminLogSchema>;
 export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
+export type InsertAiProvider = z.infer<typeof insertAiProviderSchema>;
+export type InsertUserProviderConfig = z.infer<typeof insertUserProviderConfigSchema>;

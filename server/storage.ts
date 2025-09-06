@@ -2,12 +2,18 @@ import {
   users,
   conversations,
   messages,
+  aiProviders,
+  userProviderConfigs,
   type User,
   type UpsertUser,
   type Conversation,
   type Message,
+  type AiProvider,
+  type UserProviderConfig,
   type InsertConversation,
   type InsertMessage,
+  type InsertAiProvider,
+  type InsertUserProviderConfig,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte } from "drizzle-orm";
@@ -51,6 +57,21 @@ export interface IStorage {
   // Admin operations
   getAllUsers(): Promise<User[]>;
   getSystemStats(): Promise<any>;
+  
+  // AI Provider operations
+  createAiProvider(provider: InsertAiProvider): Promise<AiProvider>;
+  getAllAiProviders(): Promise<AiProvider[]>;
+  getAiProvider(id: string): Promise<AiProvider | undefined>;
+  getAiProviderBySlug(slug: string): Promise<AiProvider | undefined>;
+  updateAiProvider(id: string, updates: Partial<AiProvider>): Promise<AiProvider>;
+  deleteAiProvider(id: string): Promise<void>;
+  
+  // User Provider Config operations
+  createUserProviderConfig(config: InsertUserProviderConfig): Promise<UserProviderConfig>;
+  getUserProviderConfigs(userId: string): Promise<UserProviderConfig[]>;
+  getUserProviderConfig(userId: string, providerId: string): Promise<UserProviderConfig | undefined>;
+  updateUserProviderConfig(id: string, updates: Partial<UserProviderConfig>): Promise<UserProviderConfig>;
+  deleteUserProviderConfig(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -282,6 +303,85 @@ export class DatabaseStorage implements IStorage {
       activeUsers: userStats.filter((user: any) => user.lastMessageDate && 
         new Date(user.lastMessageDate) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length
     };
+  }
+
+  // AI Provider operations
+  async createAiProvider(provider: InsertAiProvider): Promise<AiProvider> {
+    const [result] = await db.insert(aiProviders).values(provider).returning();
+    return result;
+  }
+
+  async getAllAiProviders(): Promise<AiProvider[]> {
+    return await db
+      .select()
+      .from(aiProviders)
+      .orderBy(aiProviders.name);
+  }
+
+  async getAiProvider(id: string): Promise<AiProvider | undefined> {
+    const [result] = await db
+      .select()
+      .from(aiProviders)
+      .where(eq(aiProviders.id, id));
+    return result;
+  }
+
+  async getAiProviderBySlug(slug: string): Promise<AiProvider | undefined> {
+    const [result] = await db
+      .select()
+      .from(aiProviders)
+      .where(eq(aiProviders.slug, slug));
+    return result;
+  }
+
+  async updateAiProvider(id: string, updates: Partial<AiProvider>): Promise<AiProvider> {
+    const [result] = await db
+      .update(aiProviders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(aiProviders.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteAiProvider(id: string): Promise<void> {
+    await db.delete(aiProviders).where(eq(aiProviders.id, id));
+  }
+
+  // User Provider Config operations
+  async createUserProviderConfig(config: InsertUserProviderConfig): Promise<UserProviderConfig> {
+    const [result] = await db.insert(userProviderConfigs).values(config).returning();
+    return result;
+  }
+
+  async getUserProviderConfigs(userId: string): Promise<UserProviderConfig[]> {
+    return await db
+      .select()
+      .from(userProviderConfigs)
+      .where(eq(userProviderConfigs.userId, userId));
+  }
+
+  async getUserProviderConfig(userId: string, providerId: string): Promise<UserProviderConfig | undefined> {
+    const [result] = await db
+      .select()
+      .from(userProviderConfigs)
+      .where(and(
+        eq(userProviderConfigs.userId, userId),
+        eq(userProviderConfigs.providerId, providerId)
+      ));
+    return result;
+  }
+
+  async updateUserProviderConfig(id: string, updates: Partial<UserProviderConfig>): Promise<UserProviderConfig> {
+    const [result] = await db
+      .update(userProviderConfigs)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(userProviderConfigs.id, id))
+      .returning();
+    return result;
+  }
+
+  async deleteUserProviderConfig(id: string): Promise<void> {
+    await db.delete(userProviderConfigs).where(eq(userProviderConfigs.id, id));
   }
 }
 

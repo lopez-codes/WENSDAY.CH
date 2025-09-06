@@ -4,7 +4,7 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 // Simple system - no complex providers needed
-import { insertMessageSchema, insertConversationSchema, users, adminLogs, systemSettings, type User, type AdminLog, type SystemSetting } from "@shared/schema";
+import { insertMessageSchema, insertConversationSchema, insertAiProviderSchema, users, adminLogs, systemSettings, aiProviders, type User, type AdminLog, type SystemSetting, type AiProvider } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
 import { eq, desc } from "drizzle-orm";
@@ -1195,6 +1195,259 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Super admin init error:", error);
       res.status(500).json({ error: "Failed to initialize super admin" });
+    }
+  });
+
+  // AI Provider Routes (Admin Only)
+  app.get('/api/admin/ai-providers', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const providers = await storage.getAllAiProviders();
+      res.json(providers);
+    } catch (error) {
+      console.error("Error fetching AI providers:", error);
+      res.status(500).json({ error: "Failed to fetch AI providers" });
+    }
+  });
+
+  app.post('/api/admin/ai-providers', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const providerData = insertAiProviderSchema.parse(req.body);
+      const provider = await storage.createAiProvider(providerData);
+
+      // Log admin action
+      await db.insert(adminLogs).values({
+        adminId: userId,
+        action: 'ai_provider_created',
+        details: { providerId: provider.id, providerName: provider.name },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || '',
+      });
+
+      res.json(provider);
+    } catch (error) {
+      console.error("Error creating AI provider:", error);
+      res.status(500).json({ error: "Failed to create AI provider" });
+    }
+  });
+
+  app.put('/api/admin/ai-providers/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { id } = req.params;
+      const updates = req.body;
+      
+      const provider = await storage.updateAiProvider(id, updates);
+
+      // Log admin action
+      await db.insert(adminLogs).values({
+        adminId: userId,
+        action: 'ai_provider_updated',
+        details: { providerId: id, updates },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || '',
+      });
+
+      res.json(provider);
+    } catch (error) {
+      console.error("Error updating AI provider:", error);
+      res.status(500).json({ error: "Failed to update AI provider" });
+    }
+  });
+
+  app.delete('/api/admin/ai-providers/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { id } = req.params;
+      await storage.deleteAiProvider(id);
+
+      // Log admin action
+      await db.insert(adminLogs).values({
+        adminId: userId,
+        action: 'ai_provider_deleted',
+        details: { providerId: id },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || '',
+      });
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting AI provider:", error);
+      res.status(500).json({ error: "Failed to delete AI provider" });
+    }
+  });
+
+  // Initialize default AI providers endpoint
+  app.post('/api/admin/init-default-providers', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      // Default AI providers configuration
+      const defaultProviders = [
+        {
+          name: "OpenAI",
+          slug: "openai",
+          description: "OpenAI ChatGPT models including GPT-4 Turbo and GPT-3.5",
+          baseUrl: "https://api.openai.com/v1",
+          apiKeyName: "OPENAI_API_KEY",
+          isActive: true,
+          supportedModels: [
+            { id: "gpt-4-turbo", name: "GPT-4 Turbo", context: 128000, vision: true },
+            { id: "gpt-4", name: "GPT-4", context: 8192, vision: false },
+            { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", context: 16385, vision: false }
+          ],
+          defaultModel: "gpt-4-turbo",
+          features: { streaming: true, vision: true, functions: true },
+          adminOnly: false,
+          requiresApproval: false
+        },
+        {
+          name: "Anthropic Claude",
+          slug: "anthropic",
+          description: "Anthropic Claude models including Claude-3.5 Sonnet",
+          baseUrl: "https://api.anthropic.com",
+          apiKeyName: "ANTHROPIC_API_KEY",
+          isActive: true,
+          supportedModels: [
+            { id: "claude-3-5-sonnet-20241022", name: "Claude-3.5 Sonnet", context: 200000, vision: true },
+            { id: "claude-3-opus-20240229", name: "Claude-3 Opus", context: 200000, vision: true },
+            { id: "claude-3-haiku-20240307", name: "Claude-3 Haiku", context: 200000, vision: true }
+          ],
+          defaultModel: "claude-3-5-sonnet-20241022",
+          features: { streaming: true, vision: true, functions: false },
+          adminOnly: false,
+          requiresApproval: false
+        },
+        {
+          name: "Google Gemini",
+          slug: "google",
+          description: "Google Gemini models including Gemini Pro and Flash",
+          baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+          apiKeyName: "GEMINI_API_KEY",
+          isActive: true,
+          supportedModels: [
+            { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash", context: 1000000, vision: true },
+            { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", context: 2000000, vision: true }
+          ],
+          defaultModel: "gemini-2.5-flash",
+          features: { streaming: true, vision: true, functions: true },
+          adminOnly: false,
+          requiresApproval: false
+        },
+        {
+          name: "Microsoft OpenAI",
+          slug: "microsoft-openai",
+          description: "Microsoft Azure OpenAI Service",
+          baseUrl: "https://your-resource.openai.azure.com/",
+          apiKeyName: "AZURE_OPENAI_API_KEY",
+          isActive: false,
+          supportedModels: [
+            { id: "gpt-4-turbo", name: "GPT-4 Turbo", context: 128000, vision: true },
+            { id: "gpt-35-turbo", name: "GPT-3.5 Turbo", context: 16385, vision: false }
+          ],
+          defaultModel: "gpt-4-turbo",
+          features: { streaming: true, vision: true, functions: true },
+          adminOnly: true,
+          requiresApproval: true
+        },
+        {
+          name: "Perplexity",
+          slug: "perplexity",
+          description: "Perplexity AI with real-time web search capabilities",
+          baseUrl: "https://api.perplexity.ai",
+          apiKeyName: "PERPLEXITY_API_KEY",
+          isActive: false,
+          supportedModels: [
+            { id: "llama-3.1-sonar-huge-128k-online", name: "Llama 3.1 Sonar Huge (Online)", context: 128000, search: true },
+            { id: "llama-3.1-sonar-large-128k-online", name: "Llama 3.1 Sonar Large (Online)", context: 128000, search: true },
+            { id: "llama-3.1-sonar-small-128k-online", name: "Llama 3.1 Sonar Small (Online)", context: 128000, search: true }
+          ],
+          defaultModel: "llama-3.1-sonar-small-128k-online",
+          features: { streaming: true, search: true, citations: true },
+          adminOnly: false,
+          requiresApproval: false
+        },
+        {
+          name: "xAI Grok",
+          slug: "xai",
+          description: "xAI Grok models with real-time information",
+          baseUrl: "https://api.x.ai/v1",
+          apiKeyName: "XAI_API_KEY",
+          isActive: false,
+          supportedModels: [
+            { id: "grok-2-vision-1212", name: "Grok-2 Vision", context: 8192, vision: true },
+            { id: "grok-2-1212", name: "Grok-2", context: 131072, vision: false },
+            { id: "grok-vision-beta", name: "Grok Vision Beta", context: 8192, vision: true },
+            { id: "grok-beta", name: "Grok Beta", context: 131072, vision: false }
+          ],
+          defaultModel: "grok-2-1212",
+          features: { streaming: true, vision: true, realtime: true },
+          adminOnly: false,
+          requiresApproval: false
+        }
+      ];
+
+      const createdProviders = [];
+      for (const providerData of defaultProviders) {
+        try {
+          // Check if provider already exists
+          const existing = await storage.getAiProviderBySlug(providerData.slug);
+          if (!existing) {
+            const provider = await storage.createAiProvider(providerData);
+            createdProviders.push(provider);
+          }
+        } catch (error) {
+          console.error(`Failed to create provider ${providerData.name}:`, error);
+        }
+      }
+
+      // Log admin action
+      await db.insert(adminLogs).values({
+        adminId: userId,
+        action: 'default_providers_initialized',
+        details: { providersCreated: createdProviders.length },
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent') || '',
+      });
+
+      res.json({ 
+        success: true, 
+        providersCreated: createdProviders.length,
+        providers: createdProviders 
+      });
+    } catch (error) {
+      console.error("Error initializing default providers:", error);
+      res.status(500).json({ error: "Failed to initialize default providers" });
     }
   });
 

@@ -12,6 +12,7 @@ import { AlertCircle, Users, Activity, Shield, Settings, Eye, Edit, Trash2, Crow
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { AdminLayout } from "@/components/layout/admin-layout";
 import type { User } from "@shared/schema";
 
 interface SystemStats {
@@ -39,7 +40,7 @@ export default function AdminDashboard() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   // Check admin access
-  if (!user?.isAdmin) {
+  if (!(user as any)?.isAdmin) {
     return (
       <div className="container mx-auto py-8">
         <Card>
@@ -58,17 +59,17 @@ export default function AdminDashboard() {
   // Queries
   const { data: users = [], isLoading: usersLoading } = useQuery({
     queryKey: ["/api/admin/users"],
-    enabled: !!user?.isAdmin,
+    enabled: !!(user as any)?.isAdmin,
   });
 
   const { data: stats, isLoading: statsLoading } = useQuery<SystemStats>({
     queryKey: ["/api/admin/stats"],
-    enabled: !!user?.isAdmin,
+    enabled: !!(user as any)?.isAdmin,
   });
 
   const { data: logs = [], isLoading: logsLoading } = useQuery<AdminLog[]>({
     queryKey: ["/api/admin/logs"],
-    enabled: !!user?.isAdmin,
+    enabled: !!(user as any)?.isAdmin,
   });
 
   // Mutations
@@ -130,19 +131,16 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-          <p className="text-muted-foreground">
-            wensday.ch Plattform-Verwaltung • Admin ID: {user?.adminId || "N/A"}
-          </p>
+    <AdminLayout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">System Dashboard</h1>
+            <p className="text-muted-foreground">
+              KI-Agenten Modulierung und Plattform-Kontrolle
+            </p>
+          </div>
         </div>
-        <Badge variant="destructive" className="flex items-center gap-2">
-          <Crown className="h-4 w-4" />
-          {user?.adminLevel?.toUpperCase() || "ADMIN"}
-        </Badge>
-      </div>
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4">
@@ -531,6 +529,7 @@ export default function AdminDashboard() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </AdminLayout>
   );
 }

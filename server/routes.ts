@@ -900,6 +900,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Free Chat Route for Guest Users (No Authentication Required)
+  app.post('/api/chat/free', async (req: any, res) => {
+    try {
+      const { message } = req.body;
+      
+      if (!message || typeof message !== 'string') {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      // Simple rate limiting for guest users (IP-based)
+      const clientIP = req.ip || req.connection.remoteAddress;
+      
+      // Enhanced AI with Quality Control System
+      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({ 
+          message: "AI service temporarily unavailable. Please try again later." 
+        });
+      }
+
+      const qualityController = new AIQualityController(apiKey);
+      
+      // Simple conversation context for guest users
+      const conversationHistory = [
+        { role: "user", content: message }
+      ];
+
+      // Guest context - Swiss-focused but no personal data
+      const guestContext = {
+        isGuest: true,
+        language: "German", 
+        location: "Switzerland",
+        responseStyle: "professional but friendly"
+      };
+
+      try {
+        const aiResponse = await qualityController.generateResponse(
+          conversationHistory,
+          guestContext,
+          'gemini-2.5-flash'
+        );
+
+        // Return response without saving to database
+        res.json({
+          success: true,
+          response: aiResponse.content,
+          hasErrors: aiResponse.hasErrors || false,
+          confidenceScore: aiResponse.confidenceScore || 85,
+          isGuest: true,
+          message: "Free Chat - Anmelden für erweiterte Funktionen"
+        });
+
+      } catch (aiError) {
+        console.error("Guest AI response error:", aiError);
+        res.status(500).json({ 
+          message: "Sorry, I'm having trouble responding right now. Please try again." 
+        });
+      }
+
+    } catch (error) {
+      console.error("Free chat error:", error);
+      res.status(500).json({ 
+        message: "An error occurred. Please try again later." 
+      });
+    }
+  });
+
   // Admin Middleware - Check if user is admin
   const isAdmin = async (req: any, res: any, next: any) => {
     try {

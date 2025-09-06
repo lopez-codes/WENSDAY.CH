@@ -47,6 +47,10 @@ export interface IStorage {
   // Message operations
   createMessage(message: InsertMessage): Promise<Message>;
   getConversationMessages(conversationId: string): Promise<Message[]>;
+  
+  // Admin operations
+  getAllUsers(): Promise<User[]>;
+  getSystemStats(): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -228,6 +232,56 @@ export class DatabaseStorage implements IStorage {
       eq(conversations.userId, userId),
       gte(conversations.createdAt, afterDate)
     ));
+  }
+
+  // Admin operations
+  async getAllUsers(): Promise<User[]> {
+    return await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt));
+  }
+
+  async getSystemStats(): Promise<any> {
+    // Get user counts by subscription tier
+    const userStats = await db
+      .select()
+      .from(users);
+
+    // Calculate statistics
+    const totalUsers = userStats.length;
+    const subscriptionCounts = userStats.reduce((acc: any, user: any) => {
+      acc[user.subscriptionTier || 'free'] = (acc[user.subscriptionTier || 'free'] || 0) + 1;
+      return acc;
+    }, {});
+
+    const coreUsers = userStats.filter((user: any) => user.hasCoreAccess).length;
+    const adminUsers = userStats.filter((user: any) => user.isAdmin).length;
+
+    // Get message count for today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayMessages = await db
+      .select()
+      .from(messages)
+      .where(gte(messages.createdAt, today));
+
+    // Get total conversations
+    const totalConversations = await db
+      .select()
+      .from(conversations);
+
+    return {
+      totalUsers,
+      subscriptionCounts,
+      coreUsers,
+      adminUsers,
+      messagesToday: todayMessages.length,
+      totalConversations: totalConversations.length,
+      activeUsers: userStats.filter((user: any) => user.lastMessageDate && 
+        new Date(user.lastMessageDate) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length
+    };
   }
 }
 

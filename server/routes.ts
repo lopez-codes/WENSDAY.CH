@@ -4,10 +4,10 @@ import Stripe from "stripe";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 // Simple system - no complex providers needed
-import { insertMessageSchema, insertConversationSchema, users } from "@shared/schema";
+import { insertMessageSchema, insertConversationSchema, users, adminLogs, systemSettings, type User, type AdminLog, type SystemSetting } from "@shared/schema";
 import { z } from "zod";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { 
   postfinanceClient, 
   POSTFINANCE_PRODUCTS, 
@@ -897,6 +897,238 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Raw model access error:", error);
       res.status(500).json({ error: "Raw model access failed" });
+    }
+  });
+
+  // Admin Middleware - Check if user is admin
+  const isAdmin = async (req: any, res: any, next: any) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+
+      const user = await storage.getUser(userId);
+      if (!user || !user.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      req.adminUser = user;
+      next();
+    } catch (error) {
+      console.error("Admin auth error:", error);
+      res.status(500).json({ error: "Admin authentication failed" });
+    }
+  };
+
+  // Admin Log Helper
+  const logAdminAction = async (adminId: string, action: string, targetUserId: string | null, details: any, req: any) => {
+    try {
+      await db.insert(adminLogs).values({
+        adminId,
+        action,
+        targetUserId,
+        details,
+        ipAddress: req.ip,
+        userAgent: req.get('User-Agent'),
+      });
+    } catch (error) {
+      console.error("Failed to log admin action:", error);
+    }
+  };
+
+  // =============================================================================
+  // ADMIN API ROUTES
+  // =============================================================================
+
+  // Get all users (admin overview)
+  app.get('/api/admin/users', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const users = await storage.getAllUsers();
+      
+      // Remove sensitive data
+      const safeUsers = users.map((user: User) => ({
+        ...user,
+        coreApiKey: user.coreApiKey ? '***HIDDEN***' : null,
+      }));
+
+      await logAdminAction(req.adminUser.id, 'view_users', null, { count: users.length }, req);
+      res.json(safeUsers);
+    } catch (error) {
+      console.error("Admin get users error:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Get user statistics
+  app.get('/api/admin/stats', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const stats = await storage.getSystemStats();
+      
+      await logAdminAction(req.adminUser.id, 'view_stats', null, {}, req);
+      res.json(stats);
+    } catch (error) {
+      console.error("Admin stats error:", error);
+      res.status(500).json({ error: "Failed to fetch statistics" });
+    }
+  });
+
+  // Update user (admin action)
+  app.patch('/api/admin/users/:userId', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const updates = req.body;
+      
+      // Don't allow updating super admin
+      const targetUser = await storage.getUser(userId);
+      if (targetUser?.adminLevel === 'super_admin' && req.adminUser.adminLevel !== 'super_admin') {
+        return res.status(403).json({ error: "Cannot modify super admin" });
+      }
+
+      const updatedUser = await storage.updateUser(userId, updates);
+      
+      await logAdminAction(req.adminUser.id, 'user_update', userId, updates, req);
+      
+      // Remove sensitive data
+      const safeUser = {
+        ...updatedUser,
+        coreApiKey: updatedUser.coreApiKey ? '***HIDDEN***' : null,
+      };
+      
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Admin update user error:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Activate/Deactivate wensday-core access
+  app.post('/api/admin/core-access/:userId', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { userId } = req.params;
+      const { activate } = req.body;
+      
+      if (!req.adminUser.canManageCore) {
+        return res.status(403).json({ error: "Core management permission required" });
+      }
+
+      const updates: any = {
+        hasCoreAccess: activate,
+        subscriptionTier: activate ? 'wensday_core' : 'pro',
+      };
+
+      if (activate) {
+        const WensdayCore = (await import('./wensday-core')).WensdayCore;
+        updates.coreApiKey = WensdayCore.generateCoreApiKey(userId);
+        updates.unlimitedAccess = true;
+        updates.directKiIntegration = true;
+        updates.fullControlMode = true;
+        updates.developerResponsibility = true;
+      } else {
+        updates.coreApiKey = null;
+        updates.unlimitedAccess = false;
+        updates.directKiIntegration = false;
+        updates.fullControlMode = false;
+        updates.developerResponsibility = false;
+      }
+
+      const user = await storage.updateUser(userId, updates);
+      
+      await logAdminAction(
+        req.adminUser.id, 
+        activate ? 'core_access_granted' : 'core_access_revoked', 
+        userId, 
+        { activate }, 
+        req
+      );
+      
+      res.json({ 
+        success: true, 
+        message: activate ? 'Core access granted' : 'Core access revoked',
+        user: {
+          ...user,
+          coreApiKey: user.coreApiKey ? '***HIDDEN***' : null,
+        }
+      });
+    } catch (error) {
+      console.error("Admin core access error:", error);
+      res.status(500).json({ error: "Failed to manage core access" });
+    }
+  });
+
+  // Get admin logs
+  app.get('/api/admin/logs', isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { limit = 50, offset = 0 } = req.query;
+      
+      const logs = await db
+        .select()
+        .from(adminLogs)
+        .orderBy(desc(adminLogs.createdAt))
+        .limit(parseInt(limit as string))
+        .offset(parseInt(offset as string));
+      
+      res.json(logs);
+    } catch (error) {
+      console.error("Admin logs error:", error);
+      res.status(500).json({ error: "Failed to fetch admin logs" });
+    }
+  });
+
+  // Initialize super admin (dev.n.lopez@gmail.com as Admin ID 00)
+  app.post('/api/admin/init-super-admin', async (req, res) => {
+    try {
+      // Check if super admin already exists
+      const existingSuperAdmin = await db
+        .select()
+        .from(users)
+        .where(eq(users.adminLevel, 'super_admin'))
+        .limit(1);
+
+      if (existingSuperAdmin.length > 0) {
+        return res.status(400).json({ error: "Super admin already exists" });
+      }
+
+      // Find user by email dev.n.lopez@gmail.com
+      const adminUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.email, 'dev.n.lopez@gmail.com'))
+        .limit(1);
+
+      if (adminUser.length === 0) {
+        return res.status(404).json({ error: "Admin user not found. Please login first." });
+      }
+
+      // Upgrade to super admin
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          isAdmin: true,
+          adminLevel: 'super_admin',
+          adminId: '00',
+          canManageUsers: true,
+          canManageSubscriptions: true,
+          canAccessStats: true,
+          canManageCore: true,
+          subscriptionTier: 'wensday_core',
+          hasCoreAccess: true,
+          unlimitedAccess: true,
+          directKiIntegration: true,
+          fullControlMode: true,
+          developerResponsibility: true,
+        })
+        .where(eq(users.id, adminUser[0].id))
+        .returning();
+
+      res.json({ 
+        success: true, 
+        message: "Super admin initialized successfully",
+        adminId: '00'
+      });
+    } catch (error) {
+      console.error("Super admin init error:", error);
+      res.status(500).json({ error: "Failed to initialize super admin" });
     }
   });
 

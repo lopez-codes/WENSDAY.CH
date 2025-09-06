@@ -38,6 +38,12 @@ export const users = pgTable("users", {
   paymentMethod: varchar("payment_method").default("stripe"), // stripe, postfinance
   preferredAiModel: varchar("preferred_ai_model"), // user's preferred AI model
   isAdmin: boolean("is_admin").default(false), // admin permissions
+  adminLevel: varchar("admin_level"), // "super_admin", "admin", "moderator"
+  adminId: varchar("admin_id"), // unique admin identifier (e.g., "00" for super admin)
+  canManageUsers: boolean("can_manage_users").default(false),
+  canManageSubscriptions: boolean("can_manage_subscriptions").default(false),
+  canAccessStats: boolean("can_access_stats").default(false),
+  canManageCore: boolean("can_manage_core").default(false),
   dailyMessageCount: integer("daily_message_count").default(0),
   lastMessageDate: timestamp("last_message_date"),
   // Business Enhancement Fields
@@ -100,6 +106,28 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Admin Actions Log Table
+export const adminLogs = pgTable("admin_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminId: varchar("admin_id").notNull().references(() => users.id, { onDelete: 'cascade' }),
+  action: varchar("action").notNull(), // "user_update", "subscription_change", "core_access", etc.
+  targetUserId: varchar("target_user_id"), // User being acted upon
+  details: jsonb("details"), // Action details and changes
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// System Settings Table
+export const systemSettings = pgTable("system_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  settingKey: varchar("setting_key").unique().notNull(),
+  settingValue: jsonb("setting_value").notNull(),
+  description: text("description"),
+  lastUpdatedBy: varchar("last_updated_by").references(() => users.id),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -118,10 +146,24 @@ export const insertMessageSchema = createInsertSchema(messages).omit({
   createdAt: true,
 });
 
+export const insertAdminLogSchema = createInsertSchema(adminLogs).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
 export type Conversation = typeof conversations.$inferSelect;
 export type Message = typeof messages.$inferSelect;
+export type AdminLog = typeof adminLogs.$inferSelect;
+export type SystemSetting = typeof systemSettings.$inferSelect;
 export type InsertConversation = z.infer<typeof insertConversationSchema>;
 export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type InsertAdminLog = z.infer<typeof insertAdminLogSchema>;
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;

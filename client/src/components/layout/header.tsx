@@ -74,6 +74,11 @@ export default function Header() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                {(user as any)?.isAdmin && (
+                  <DropdownMenuItem onClick={() => window.location.href = '/admin'}>
+                    Admin Dashboard
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => window.location.href = '/settings'}>
                   Einstellungen
                 </DropdownMenuItem>

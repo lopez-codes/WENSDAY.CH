@@ -11,6 +11,7 @@ import StylesOverview from "@/pages/styles-overview";
 import Crowdfunding from "@/pages/crowdfunding";
 import FirebaseOverview from "@/pages/firebase-overview";
 import WensdayCore from "@/pages/wensday-core";
+import AdminDashboard from "@/pages/admin-dashboard";
 import SettingsPage from "@/pages/settings";
 import Subscribe from "@/pages/subscribe";
 import PostFinanceSubscribe from "@/pages/postfinance-subscribe";
@@ -60,6 +61,7 @@ function Router() {
           <Route path="/privacy" component={Privacy} />
           <Route path="/terms" component={Terms} />
           <Route path="/wensday-core" component={WensdayCore} />
+          <Route path="/admin" component={AdminDashboard} />
         </>
       )}
       <Route component={NotFound} />

@@ -1,0 +1,223 @@
+# Alert Rules for wensday.ch MVP
+groups:
+  - name: wensday_app_alerts
+    rules:
+      # Application Health
+      - alert: ApplicationDown
+        expr: up{job="wensday-app"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: wensday-ch
+        annotations:
+          summary: "wensday.ch application is down"
+          description: "The main application has been down for more than 2 minutes"
+          runbook_url: "https://docs.wensday.ch/runbooks/app-down"
+
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          service: wensday-ch
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value }} errors per second"
+
+      - alert: HighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          service: wensday-ch
+        annotations:
+          summary: "High response time"
+          description: "95th percentile response time is {{ $value }}s"
+
+  - name: database_alerts
+    rules:
+      # Database Health
+      - alert: DatabaseDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "Database has been unavailable for more than 1 minute"
+
+      - alert: DatabaseConnectionsHigh
+        expr: pg_stat_database_numbackends / pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: database
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connections are at {{ $value }}% of maximum"
+
+      - alert: DatabaseDiskSpaceHigh
+        expr: (1 - pg_database_size_bytes / on() group_left() node_filesystem_size_bytes{mountpoint="/var/lib/postgresql/data"}) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          service: database
+        annotations:
+          summary: "Database disk space critically low"
+          description: "Less than 10% disk space remaining"
+
+  - name: business_alerts
+    rules:
+      # Business Metrics
+      - alert: HighAIProviderFailureRate
+        expr: rate(ai_provider_requests_failed_total[5m]) / rate(ai_provider_requests_total[5m]) > 0.2
+        for: 3m
+        labels:
+          severity: warning
+          service: ai-providers
+        annotations:
+          summary: "AI provider failure rate high"
+          description: "{{ $labels.provider }} has {{ $value | humanizePercentage }} failure rate"
+
+      - alert: UserRegistrationSpike
+        expr: increase(user_registrations_total[1h]) > 100
+        for: 0m
+        labels:
+          severity: info
+          service: business
+        annotations:
+          summary: "Unusual user registration activity"
+          description: "{{ $value }} new users registered in the last hour"
+
+      - alert: RevenueDropSignificant
+        expr: rate(subscription_revenue_total[1h]) < 0.5 * rate(subscription_revenue_total[1h] offset 24h)
+        for: 30m
+        labels:
+          severity: warning
+          service: business
+        annotations:
+          summary: "Significant revenue drop detected"
+          description: "Hourly revenue is 50% below yesterday's rate"
+
+      - alert: MessageLimitExceeded
+        expr: rate(messages_rejected_limit_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: rate-limiting
+        annotations:
+          summary: "High rate of message limit rejections"
+          description: "{{ $value }} messages per second rejected due to limits"
+
+  - name: infrastructure_alerts
+    rules:
+      # Infrastructure Health
+      - alert: HighMemoryUsage
+        expr: (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage is at {{ $value | humanizePercentage }}"
+
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage is at {{ $value }}%"
+
+      - alert: DiskSpaceLow
+        expr: (1 - node_filesystem_avail_bytes / node_filesystem_size_bytes) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: "Disk space running low"
+          description: "Disk usage on {{ $labels.mountpoint }} is at {{ $value | humanizePercentage }}"
+
+      - alert: SSLCertificateExpiring
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 7
+        for: 0m
+        labels:
+          severity: warning
+          service: ssl
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate for {{ $labels.instance }} expires in {{ $value | humanizeDuration }}"
+
+  - name: security_alerts
+    rules:
+      # Security Monitoring
+      - alert: UnusualLoginActivity
+        expr: rate(auth_login_attempts_failed_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High failed login attempts"
+          description: "{{ $value }} failed login attempts per second"
+
+      - alert: AdminActionSpike
+        expr: rate(admin_actions_total[5m]) > 5
+        for: 1m
+        labels:
+          severity: info
+          service: security
+        annotations:
+          summary: "High admin activity"
+          description: "{{ $value }} admin actions per second"
+
+      - alert: UnauthorizedAPIAccess
+        expr: rate(http_requests_total{status="403"}[5m]) > 5
+        for: 3m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High rate of unauthorized access attempts"
+          description: "{{ $value }} 403 responses per second"
+
+  - name: ai_provider_alerts
+    rules:
+      # AI Provider Specific
+      - alert: OpenAIQuotaExceeded
+        expr: ai_provider_quota_usage{provider="openai"} > 0.9
+        for: 0m
+        labels:
+          severity: warning
+          service: ai-providers
+          provider: openai
+        annotations:
+          summary: "OpenAI quota nearly exceeded"
+          description: "OpenAI usage at {{ $value | humanizePercentage }} of quota"
+
+      - alert: ClaudeAPIDown
+        expr: ai_provider_health{provider="anthropic"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: ai-providers
+          provider: anthropic
+        annotations:
+          summary: "Claude API is unreachable"
+          description: "Anthropic Claude API has been down for 2 minutes"
+
+      - alert: GeminiRateLimited
+        expr: rate(ai_provider_requests_rate_limited_total{provider="google"}[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: ai-providers
+          provider: google
+        annotations:
+          summary: "Gemini API rate limiting detected"
+          description: "{{ $value }} rate limited requests per second for Gemini"

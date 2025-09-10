@@ -22,7 +22,7 @@ const plans = [
   },
   {
     name: "Ultra Access",
-    price: 29,
+    price: 15,
     description: "Per month",
     popular: true,
     features: [
@@ -33,12 +33,12 @@ const plans = [
     ],
     restrictions: [],
     buttonText: "Upgrade Now",
-    buttonAction: () => window.location.href = '/subscribe',
+    buttonAction: () => window.location.href = '/postfinance-subscribe',
     buttonVariant: "default" as const,
   },
   {
     name: "Pro",
-    price: 99,
+    price: 35,
     description: "Per month",
     features: [
       "Unlimited messages",
@@ -47,8 +47,8 @@ const plans = [
       "API access",
     ],
     restrictions: [],
-    buttonText: "Contact Sales",
-    buttonAction: () => window.location.href = '/subscribe',
+    buttonText: "Upgrade to Pro",
+    buttonAction: () => window.location.href = '/postfinance-subscribe',
     buttonVariant: "secondary" as const,
   },
 ];

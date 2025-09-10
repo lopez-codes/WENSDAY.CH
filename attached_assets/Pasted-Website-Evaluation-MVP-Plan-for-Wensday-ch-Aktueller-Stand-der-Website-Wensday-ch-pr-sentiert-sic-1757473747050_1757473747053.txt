@@ -1,0 +1,138 @@
+Website Evaluation & MVP Plan for Wensday.ch
+Aktueller Stand der Website
+
+Wensday.ch präsentiert sich als Marketing‑Landing‑Page für eine Schweizer AI‑Chat‑Plattform. Die Seite ist statisch und besteht im Wesentlichen aus einer Handvoll Sektionen, die über einen One‑Page‑Navigator (Anker) verlinkt sind:
+
+Start/Hero – Überschrift „Swiss AI Chat Multiverse“ mit kurzer Beschreibung (professionelle, unabhängige AI‑Research‑ und Chat‑Plattform) und zwei Call‑To‑Actions („Start Free Chat“ und „View Pricing“). Rechts daneben ein Demo‑Chat‑Fenster mit vordefinierten Nachrichten. Darunter ein Hinweis „This is a demo – sign in to chat!“.
+
+Swiss AI Innovation – Drei Leistungsversprechen werden hervorgehoben:
+
+Swiss Data Protection – Gespräche werden in der Schweiz gehostet; höchste Datenschutzstandards.
+
+AI Multiverse – Zugriff auf mehrere AI‑Modelle (u. a. Google Gemini) in einer Oberfläche.
+
+Professional Research – Unabhängige AI‑Research‑Plattform für professionelle, unverfälschte Informationen.
+
+Pricing – Drei Abonnement‑Pläne: Free (CHF 0, 10 Nachrichten/Tag, Basic AI‑Modelle, kein Verlauf), Ultra Access (CHF 29/Monat, 500 Nachrichten pro Tag, alle AI‑Modelle, Chat‑Verlauf, Prioritäts‑Support) und Pro (CHF 99/Monat, unbegrenzte Nachrichten, Beta‑Zugang, Advanced Analytics, API‑Access). Der Abschnitt enthält Buttons „Get Started“, „Upgrade Now“ und „Contact Sales“, aber diese führen nicht zu funktionierenden Seiten.
+
+Partners – Logos von Microsoft (Azure Infrastruktur), Google (Gemini AI Models), Replit (Development Platform) und lopez.codes (Core Technology) mit dem Hinweis, dass die Plattform „Powered by lopez.codes“ ist.
+
+Footer – Drei Spalten mit Links. Unter Product finden sich „Features“, „Pricing“, „API Access“, „Multiverse“; unter Company „About“, „Research“, „Partners“, „Careers“; unter Support „Documentation“, „Help Center“, „Privacy Policy“, „Terms“. Diese Links springen jedoch nur zum Seitenanfang; es existieren keine separaten Inhalte.
+
+Funktionalität
+
+Chat‑Funktion: Es gibt ein visuelles Chat‑Fenster (rechts im Hero‑Bereich) mit fixierten Nachrichten und dem Hinweis „sign in to chat“. Ein funktionsfähiges Chat‑Interface mit Multi‑AI‑Auswahl oder Authentifizierung ist nicht implementiert; Schaltflächen zum Starten/Upgraden führen ins Leere oder versuchen, OAuth‑Flows (Replit) zu öffnen, was im Test blockiert wurde
+wensday.ch
+.
+
+Preise/Abonnements: Die Preise sind als statische Karten dargestellt; die Buttons sind nicht mit Backend‑Abläufen (z. B. Stripe‑Checkout) verknüpft.
+
+Navigation/Unterseiten: Die angezeigten „About“, „Research“, „Partners“, „Careers“, „Documentation“, „Help Center“, „Privacy Policy“ und „Terms“ existieren nicht; alle Links scrollen lediglich zum Anfang der Seite
+wensday.ch
+.
+
+Partnerhinweise: Logos und Marken werden verwendet; ein klarer rechtlicher Hinweis, ob Partnerschaften bestehen oder es sich um Technologie‑Provider handelt, fehlt.
+
+Datenschutz: Trotz des Fokus auf Schweizer Datenschutz wird keine Datenschutz‑/Cookie‑Erklärung bereitgestellt. Es ist unklar, ob Tracking‑Skripte (Google Analytics o. Ä.) vorhanden sind.
+
+Fehlende Komponenten und Verbesserungspotenzial
+
+Fehlende Unterseiten und Inhalte
+
+About / Company / Research / Partners / Careers – Es gibt keine eigenständigen Seiten oder Sektionen. Potenzielle Besucher erhalten keine Hintergrundinformationen über Wensday, das Team, die Forschungsziele oder Karrieremöglichkeiten.
+
+API Access & Multiverse – Der Footer erwähnt API‑Zugang und Multiverse; diese Bereiche sind nicht realisiert. Eine API‑Dokumentation bzw. ein Developer Portal fehlen komplett.
+
+Support‑Seiten (Documentation, Help Center) – Weder eine Benutzerhilfe noch technische Dokumentation sind vorhanden. Für eine SaaS‑Plattform sind diese essenziell.
+
+Rechtstexte – Es fehlen Datenschutzerklärung, Cookie‑Banner, Nutzungsbedingungen und Impressum (obwohl die Schweiz ein Impressumspflicht kennt). Das widerspricht dem Versprechen „Swiss Data Protection“.
+
+Unvollständige Chat‑Funktion
+
+Anmeldung/Authentifizierung – Schaltflächen „Start Chat“, „Start Free Chat“ und „Upgrade Now“ führen ins Nichts; ein echter Log‑in/Sign‑up‑Flow fehlt. Es scheint, als solle Replit OIDC eingesetzt werden, doch die Implementierung ist unvollständig.
+
+Multi‑Model‑Funktion (AI Multiverse) – Die Kernidee der Plattform ist der Zugang zu mehreren AI‑Modellen (Gemini, ggf. Wensday, etc.), aber die Auswahl oder der Wechsel zwischen Modellen ist nicht möglich.
+
+Chat‑Verlauf und Analytics – Nichts deutet auf gespeicherten Verlauf oder Analytics hin; die entsprechenden Features der Pläne sind also nicht umgesetzt.
+
+Zahlungsintegration
+
+Die Pläne erwähnen „alle Zahlungen werden via Stripe abgewickelt“, aber es gibt keine Checkout‑Integration. Ohne ein funktionierendes Abonnementsystem lassen sich keine zahlenden Kunden onboarden.
+
+Fehlende Responsivität & Accessibility
+
+Responsives Design: Die Desktop‑Ansicht wirkt solide, aber es gibt keine Hinweise auf mobiloptimierte Darstellung; das sollte noch geprüft werden.
+
+Barrierefreiheit: ARIA‑Labels und Tastaturnavigation sind nicht ersichtlich. Um professionellen Standards zu genügen, muss die Seite barrierefrei werden.
+
+Kommunikation & Vertrauen
+
+Partnerschaftsclaims: Die Logos von Microsoft, Google und Replit suggerieren offizielle Partnerschaften. Um Missverständnisse oder rechtliche Probleme zu vermeiden, sollte klar unterschieden werden zwischen Technologie‑Integration (z. B. „betrieben auf Azure“) und formellen Partnerschaften.
+
+Proof‑of‑Concept vs. MVP: Die Seite wirkt wie ein Demo‑Mockup. Um reale Nutzer anzusprechen, braucht es mehr Inhaltstiefe (Use‑Cases, Screenshots, Testimonials, Roadmap).
+
+MVP‑Plan (3‑Tages‑Zeithorizont)
+
+Um binnen drei Tagen eine funktionsfähige Minimalversion zu veröffentlichen, sollte der Fokus auf klare Informationen, Rechtskonformität und Funktionsfähigkeit des Chat‑Dienstes gelegt werden. Komplett neue Sektionen wie „Research“ oder „Careers“ können im Backlog bleiben, solange sie sauber vorbereitet sind.
+
+Tag 1 – Architektur & Grundgerüst
+
+Technologiewahl: Umsetzung als statische Site plus Chat‑Frontend (z. B. Next.js 14, Vercel oder Azure Static Web Apps).
+
+Seitenstruktur erstellen:
+
+Home/Landing (Hero, Features, Pricing, Partner‑Logos).
+
+Chat‑Seite (separat, um den Chat‑Client zu hosten; integrativ später in die Hauptseite).
+
+Info‑Seite mit Mindestangaben (About & Datenschutz/Impressum).
+
+Basis‑Routing: Implementieren Sie ein Routing (z. B. /privacy, /terms, /about, /chat) statt Anker.
+
+Login/Signup stub: Implementieren Sie einen einfachen Login/Signup‑Stub (z. B. Magic Link per E‑Mail oder OAuth‑Redirect). Achtung: Für den MVP kann zunächst ein offener Demo‑Chat ohne Authentifizierung verwendet werden, der nur 10 Anfragen/Tag zulässt (Free‑Plan).
+
+Impressum & Datenschutz: Erstellen Sie rechtssichere Texte für die Schweiz (Name/Firma, Adresse, Kontakt, Handelsregister‑Nr., Datenschutzerklärung nach revDSG/EU‑DSGVO inkl. Cookie‑Banner).
+
+Tag 2 – Chat‑Funktion & Pricing
+
+Chat‑Frontend: Integrieren Sie ein Chat‑Frontend (z. B. react-chat-ui oder Eigenentwicklung) mit API‑Backend. Für den MVP kann ein Drittanbieter‑Endpoint (z. B. Google Gemini via lopez.codes) eingebunden werden.
+
+Multi‑Model‑Stub: Implementieren Sie eine einfache Auswahl (z. B. Dropdown oder Tabs) zwischen „Gemini“ und „Wensday Core“ (falls vorhanden). Es genügt, dass das Frontend nur eine Textausgabe liefert; die tatsächliche Modellumschaltung kann in den Backend‑Code verlagert werden.
+
+Preis‑Plans: Verlinken Sie die Buttons in der Preis‑Sektion mit echten Aktionen:
+
+Get Started: öffnet Chat‑Seite (Free‑Plan).
+
+Upgrade Now: öffnet Stripe‑Checkout für CHF 29‑Abo (Integration via Stripe Checkout API).
+
+Contact Sales: stellt Kontaktformular bereit, das Anfragen per E‑Mail versendet.
+
+Partners & Logos: Ergänzen Sie einen Disclaimer, dass die genannten Unternehmen Technologie‑Provider sind und keine offiziellen Sponsoren.
+
+Tag 3 – Feinschliff & Launch
+
+Mobile‑Optimierung: Testen und optimieren Sie die Seite für Tablet und Smartphone.
+
+Cookie‑Banner & Consent: Implementieren Sie ein Consent‑Tool (z. B. Cookiebot oder self‑hosted) für Tracking (falls Google Analytics verwendet wird).
+
+SEO‑Metadaten: Hinterlegen Sie meta‑Tags, OpenGraph‑Bilder und strukturierte Daten (JSON‑LD).
+
+Analytics & Monitoring: Integrieren Sie ein leichtgewichtiges Tracking (z. B. Plausible) zur Überwachung des Traffics; implementieren Sie Server‑Logging für Chat‑Requests.
+
+Test & Deployment: Durchlaufen Sie Smoke‑Tests (Chat‑Funktion, Zahlungen, Kontaktformular, Links). Publizieren Sie die Seite (DNS‑Anpassung rechtzeitig durchführen; TTL reduzieren).
+
+Langfristige Weiterentwicklung
+
+Research‑ & Partner‑Seiten: Ausbauen mit Hintergrundinformationen, White‑Papers, Blogposts und echten Partnerporträts.
+
+User‑Dashboard: Bereitstellen eines geschützten Bereichs, in dem Nutzer ihren Verlauf sehen, Rechnungen einsehen, Modelle wechseln oder API‑Keys verwalten können.
+
+API‑Dokumentation: Entwickeln eines Entwicklerportals mit Zugangstoken, Rate‑Limits und Beispielen (z. B. mittels Swagger UI).
+
+Internationalisierung: Lokalisierung in Englisch/Deutsch/Französisch/Italienisch, um schweizerische Mehrsprachigkeit abzudecken.
+
+Compliance & Audits: Regelmäßige Datenschutz‑Audits und Penetration Tests zur Erfüllung der hohen Schweizer Datenschutzanforderungen.
+
+Fazit
+
+Die aktuelle Website ist optisch ansprechend, dient jedoch hauptsächlich als Prototyp. Die wesentlichen Features – Authentifizierung, Multi‑AI‑Chat, Abonnement‑Verwaltung, Support‑Informationen und Rechtsseiten – fehlen oder sind unvollständig. Mit dem oben skizzierten Drei‑Tages‑Plan lässt sich ein Minimalprodukt realisieren, das die Plattform legal nutzbar macht, eine funktionierende Chat‑Schnittstelle bietet, sowie grundlegende Informationen über das Unternehmen und dessen Datenschutzversprechen bereitstellt.

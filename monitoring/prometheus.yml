@@ -113,8 +113,8 @@ scrape_configs:
 remote_write:
   - url: "https://prometheus-prod-10-prod-us-central-0.grafana.net/api/prom/push"
     basic_auth:
-      username: "your_grafana_username"
-      password: "your_grafana_api_key"
+      username: "${GRAFANA_USERNAME}"
+      password: "${GRAFANA_API_KEY}"
     write_relabel_configs:
       - source_labels: [__name__]
         regex: 'wensday_.*'

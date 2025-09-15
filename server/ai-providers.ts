@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import OpenAI from "openai"; // Added from javascript_openai integration
 
 // AI Provider Interface
 export interface AIProvider {
@@ -248,6 +249,76 @@ export class OpenRouterProvider implements AIProvider {
   }
 }
 
+// OpenAI Provider - Added from javascript_openai integration
+export class OpenAIProvider implements AIProvider {
+  name = 'OpenAI';
+  private client?: OpenAI;
+
+  models: AIModel[] = [
+    {
+      id: 'gpt-5', // the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
+      name: 'GPT-5',
+      description: 'Neuestes OpenAI-Modell (August 2025)',
+      provider: 'openai',
+      pricing: 'paid',
+      capabilities: ['text', 'multimodal', 'reasoning'],
+      contextWindow: 200000
+    },
+    {
+      id: 'gpt-4o',
+      name: 'GPT-4o',
+      description: 'Omni-Modell mit Audio/Vision',
+      provider: 'openai',
+      pricing: 'paid',
+      capabilities: ['text', 'multimodal', 'audio', 'vision'],
+      contextWindow: 128000
+    },
+    {
+      id: 'gpt-4o-mini',
+      name: 'GPT-4o Mini',
+      description: 'Kostengünstige GPT-4o Version',
+      provider: 'openai',
+      pricing: 'freemium',
+      capabilities: ['text', 'multimodal'],
+      contextWindow: 128000
+    }
+  ];
+
+  constructor() {
+    if (process.env.OPENAI_API_KEY) {
+      this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    }
+  }
+
+  isAvailable(): boolean {
+    return !!this.client;
+  }
+
+  async generateResponse(model: string, messages: ChatMessage[], options?: GenerateOptions): Promise<string> {
+    if (!this.client) {
+      throw new Error('OpenAI provider not configured. Please add OPENAI_API_KEY.');
+    }
+
+    try {
+      const systemPrompt = options?.systemPrompt || SWISS_SYSTEM_PROMPT;
+      
+      const response = await this.client.chat.completions.create({
+        model: model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...messages.map(m => ({ role: m.role, content: m.content }))
+        ],
+        max_tokens: options?.maxTokens || 4096,
+        temperature: options?.temperature || 0.7
+      });
+
+      return response.choices[0]?.message?.content || "Entschuldigung, ich konnte keine Antwort generieren.";
+    } catch (error: any) {
+      throw new Error(`OpenAI error: ${error.message}`);
+    }
+  }
+}
+
 // Hugging Face Provider
 export class HuggingFaceProvider implements AIProvider {
   name = 'Hugging Face';
@@ -345,6 +416,7 @@ export class AIProviderManager {
       new GeminiProvider(),
       new DeepSeekProvider(), 
       new OpenRouterProvider(),
+      new OpenAIProvider(), // Added OpenAI provider
       new HuggingFaceProvider()
     ];
   }

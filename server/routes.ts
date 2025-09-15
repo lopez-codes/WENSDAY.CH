@@ -112,9 +112,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Tier-based model validation
       const allowedModels = {
-        free: ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free'],
-        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat'],
-        pro: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat']
+        free: ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'gpt-4o-mini'],
+        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o'],
+        pro: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o', 'gpt-5']
       };
       
       const selectedModel = requestedModel && allowedModels[userTier as keyof typeof allowedModels]?.includes(requestedModel) 
@@ -336,9 +336,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Tier-based model validation
       const allowedModels = {
-        free: ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free'],
-        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat'],
-        pro: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat']
+        free: ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'gpt-4o-mini'],
+        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o'],
+        pro: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o', 'gpt-5']
       };
       
       const selectedModel = model && allowedModels[userTier as keyof typeof allowedModels]?.includes(model) 

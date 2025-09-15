@@ -49,6 +49,30 @@ const AI_MODELS = [
     tier: "free"
   },
   {
+    id: "gpt-5",
+    name: "GPT-5",
+    description: "Neuestes OpenAI-Modell (Aug 2025)",
+    icon: Star,
+    color: "text-green-600",
+    tier: "pro"
+  },
+  {
+    id: "gpt-4o",
+    name: "GPT-4o",
+    description: "Omni-Modell Audio/Vision (OpenAI)",
+    icon: Star,
+    color: "text-green-500",
+    tier: "ultra"
+  },
+  {
+    id: "gpt-4o-mini",
+    name: "GPT-4o Mini",
+    description: "Kostengünstig (OpenAI)",
+    icon: Star,
+    color: "text-green-400",
+    tier: "free"
+  },
+  {
     id: "gemini-2.5-pro", 
     name: "Gemini 2.5 Pro",
     description: "Erweiterte Fähigkeiten (Google)",

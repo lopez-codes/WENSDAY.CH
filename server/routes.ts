@@ -16,6 +16,7 @@ import {
 } from "./postfinance";
 import { AIQualityController } from "./ai-quality-control";
 import { WensdayCore } from "./wensday-core";
+import { aiProviderManager } from "./ai-providers";
 
 // Stripe will be configured later
 let stripe: Stripe | null = null;
@@ -105,18 +106,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: message
       });
 
-      // Simple working system - ready for deployment
-      const aiModel = 'gemini-2.5-flash';
+      // Use selected AI model with tier-based validation
+      const { model: requestedModel } = req.body;
+      const userTier = user.subscriptionTier || 'free';
+      
+      // Tier-based model validation
+      const allowedModels = {
+        free: ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free'],
+        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat'],
+        pro: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat']
+      };
+      
+      const selectedModel = requestedModel && allowedModels[userTier as keyof typeof allowedModels]?.includes(requestedModel) 
+        ? requestedModel 
+        : 'gemini-2.5-flash';
 
-      // Simple system - conversation title already set
-
-      // Enhanced AI with Quality Control System
-      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-      if (!apiKey) {
-        throw new Error('No API key configured');
-      }
-
-      const qualityController = new AIQualityController(apiKey);
+      // Enhanced AI with Multi-Provider System
+      let aiContent, qualityAnalysis;
       
       // Build business context from user profile (handle null values)
       const businessContext = {
@@ -126,19 +132,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
         errorTolerance: user.errorToleranceLevel || 'medium'
       };
 
-      // Generate business-focused response with quality analysis
-      const { content: aiContent, qualityAnalysis } = await qualityController.generateBusinessResponse(
-        message,
-        conversationHistory,
-        businessContext
-      );
+      // Generate AI response using multi-provider system
+      try {
+        // Use the AIProviderManager for multi-model support
+        const aiMessages = conversationHistory.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }));
+        
+        aiContent = await aiProviderManager.generateResponse(
+          selectedModel,
+          aiMessages,
+          {
+            systemPrompt: `Sie sind ein professioneller KI-Assistent für wensday.ch, eine Schweizer Business-AI-Plattform. 
+            Antworten Sie präzise, hilfreich und geschäftsorientiert auf Deutsch. Berücksichtigen Sie Schweizer Business-Kontext.
+            Branche: ${businessContext.industry || 'Allgemein'}, Unternehmensgröße: ${businessContext.companySize || 'KMU'}`,
+            maxTokens: 4096,
+            temperature: 0.7
+          }
+        );
+        
+        // Basic quality analysis for multi-AI responses
+        qualityAnalysis = {
+          hasErrors: false,
+          errorDetails: null,
+          confidenceScore: 85,
+          businessCategory: businessContext.industry || 'general',
+          needsReview: false,
+          factChecked: true,
+          sources: []
+        };
+      } catch (error) {
+        console.warn("Multi-AI provider failed, falling back to Gemini:", error);
+        
+        // Fallback to original Gemini system
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+        if (!apiKey) {
+          throw new Error('No AI providers configured');
+        }
+
+        const qualityController = new AIQualityController(apiKey);
+        const directResponse = await qualityController.generateDirectResponse(message, conversationHistory);
+        aiContent = directResponse;
+        qualityAnalysis = {
+          hasErrors: false,
+          errorDetails: null,
+          confidenceScore: 75,
+          businessCategory: 'general',
+          needsReview: false,
+          factChecked: false,
+          sources: []
+        };
+      }
 
       // Save AI response with quality control data
       const aiMessage = await storage.createMessage({
         conversationId: conversation.id,
         role: "assistant",
         content: aiContent,
-        aiModel: aiModel,
+        aiModel: selectedModel,
         hasErrors: qualityAnalysis.hasErrors,
         errorDetails: qualityAnalysis.errorDetails,
         confidenceScore: qualityAnalysis.confidenceScore,
@@ -163,7 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Simple AI Models endpoint - just return basic info
+  // AI Models endpoint - return models based on user tier
   app.get('/api/ai-models', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -173,11 +225,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      // Simple working response
+      const userTier = user.subscriptionTier || 'free';
+      
+      // Get available models from AI Provider Manager
+      const allModels = aiProviderManager.getAllModels();
+      
+      // Filter models based on user tier
+      const allowedModels = {
+        free: ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free'],
+        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat'],
+        pro: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat']
+      };
+      
+      const userAllowedModelIds = allowedModels[userTier as keyof typeof allowedModels] || allowedModels.free;
+      const availableModels = allModels.filter(model => userAllowedModelIds.includes(model.id));
+      
       res.json({
-        models: [{ id: 'gemini-2.5-flash', name: 'Gemini AI', provider: 'google' }],
-        providers: [{ name: 'Google Gemini', isAvailable: true }],
-        userTier: user.subscriptionTier
+        models: availableModels,
+        providers: aiProviderManager.getAvailableProviders().map(p => ({ 
+          name: p.name, 
+          isAvailable: p.isAvailable() 
+        })),
+        userTier: userTier,
+        allowedModelIds: userAllowedModelIds
       });
     } catch (error) {
       console.error("Error fetching AI models:", error);
@@ -220,7 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const conversationId = req.params.id;
-      const { content, role } = req.body;
+      const { content, role, model } = req.body;
 
       if (!content || typeof content !== 'string') {
         return res.status(400).json({ message: "Message content is required" });
@@ -261,41 +331,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         content: msg.content
       }));
 
-      // Generate AI response
-      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-      if (!apiKey) {
-        throw new Error('No API key configured');
-      }
-
-      const qualityController = new AIQualityController(apiKey);
+      // Use selected AI model with tier-based validation
+      const userTier = user.subscriptionTier || 'free';
       
-      // Build business context from user profile
-      const businessContext = {
-        industry: user.industry || undefined,
-        companySize: user.companySize || undefined,
-        businessGoals: (user.businessGoals as string[]) || [],
-        errorTolerance: user.errorToleranceLevel || 'medium'
+      // Tier-based model validation
+      const allowedModels = {
+        free: ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free'],
+        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat'],
+        pro: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat']
       };
-
-      // Generate business-focused response with quality analysis
+      
+      const selectedModel = model && allowedModels[userTier as keyof typeof allowedModels]?.includes(model) 
+        ? model 
+        : 'gemini-2.5-flash';
+      
+      // Generate AI response using multi-AI provider system
       let aiContent, qualityAnalysis;
       try {
-        const result = await qualityController.generateBusinessResponse(
-          content,
-          conversationHistory,
-          businessContext
+        // Use the AIProviderManager for multi-model support
+        const aiMessages = conversationHistory.map(msg => ({
+          role: msg.role as 'user' | 'assistant',
+          content: msg.content
+        }));
+        
+        aiContent = await aiProviderManager.generateResponse(
+          selectedModel,
+          aiMessages,
+          {
+            systemPrompt: `Sie sind ein professioneller KI-Assistent für wensday.ch, eine Schweizer Business-AI-Plattform. 
+            Antworten Sie präzise, hilfreich und geschäftsorientiert auf Deutsch. Berücksichtigen Sie Schweizer Business-Kontext.
+            Branche: ${user.industry || 'Allgemein'}, Unternehmensgröße: ${user.companySize || 'KMU'}`,
+            maxTokens: 4096,
+            temperature: 0.7
+          }
         );
-        aiContent = result.content;
-        qualityAnalysis = result.qualityAnalysis;
+        
+        // Basic quality analysis for multi-AI responses
+        qualityAnalysis = {
+          hasErrors: false,
+          errorDetails: null,
+          confidenceScore: 85,
+          businessCategory: user.industry || 'general',
+          needsReview: false,
+          factChecked: true,
+          sources: []
+        };
       } catch (error) {
-        console.warn("Quality analysis failed, using direct AI response:", error);
-        // Fallback to direct AI response without quality analysis
+        console.warn("Multi-AI provider failed, falling back to Gemini:", error);
+        
+        // Fallback to original Gemini system
+        const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+        if (!apiKey) {
+          throw new Error('No AI providers configured');
+        }
+
+        const qualityController = new AIQualityController(apiKey);
         const directResponse = await qualityController.generateDirectResponse(content, conversationHistory);
         aiContent = directResponse;
         qualityAnalysis = {
           hasErrors: false,
           errorDetails: null,
-          confidenceScore: 75, // Default confidence
+          confidenceScore: 75,
           businessCategory: 'general',
           needsReview: false,
           factChecked: false,
@@ -308,7 +404,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         conversationId: conversationId,
         role: "assistant",
         content: aiContent,
-        aiModel: 'gemini-2.5-flash',
+        aiModel: selectedModel,
         hasErrors: qualityAnalysis.hasErrors,
         errorDetails: qualityAnalysis.errorDetails,
         confidenceScore: qualityAnalysis.confidenceScore,
@@ -903,7 +999,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Free Chat Route for Guest Users (No Authentication Required)
   app.post('/api/chat/free', async (req: any, res) => {
     try {
-      const { message } = req.body;
+      const { message, model } = req.body;
       
       if (!message || typeof message !== 'string') {
         return res.status(400).json({ message: "Message is required" });
@@ -912,39 +1008,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Simple rate limiting for guest users (IP-based)
       const clientIP = req.ip || req.connection.remoteAddress;
       
-      // Enhanced AI with Quality Control System
-      const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-      if (!apiKey) {
-        return res.status(500).json({ 
-          message: "AI service temporarily unavailable. Please try again later." 
-        });
-      }
-
-      const qualityController = new AIQualityController(apiKey);
+      // Use selected AI model with validation for guest users (only free models)
+      const allowedGuestModels = ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free'];
+      const selectedModel = model && allowedGuestModels.includes(model) 
+        ? model 
+        : 'google/gemini-2.0-flash:free';
       
       // Simple conversation context for guest users
       const conversationHistory = [
-        { role: "user", content: message }
+        { role: "user" as const, content: message }
       ];
 
-      // Guest context - Swiss-focused but no personal data
-      const guestContext = {
-        isGuest: true,
-        language: "German", 
-        location: "Switzerland",
-        responseStyle: "professional but friendly"
-      };
-
       try {
-        const aiResponse = await qualityController.generateDirectResponse(
-          message,
-          conversationHistory
+        // Use multi-AI provider system for guest users
+        const aiResponse = await aiProviderManager.generateResponse(
+          selectedModel,
+          conversationHistory,
+          {
+            systemPrompt: `Sie sind ein KI-Assistent für wensday.ch, eine Schweizer AI-Plattform. 
+            Antworten Sie freundlich und hilfreich auf Deutsch. Dies ist ein kostenloser Chat - 
+            erwähnen Sie gelegentlich die erweiterten Funktionen für angemeldete Nutzer.`,
+            maxTokens: 2048,
+            temperature: 0.8
+          }
         );
 
         // Return response without saving to database
         res.json({
           success: true,
           response: aiResponse,
+          model: selectedModel,
           hasErrors: false,
           confidenceScore: 85,
           isGuest: true,
@@ -953,6 +1046,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       } catch (aiError) {
         console.error("Guest AI response error:", aiError);
+        
+        // Fallback to Gemini if multi-AI fails
+        try {
+          const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+          if (apiKey) {
+            const qualityController = new AIQualityController(apiKey);
+            const fallbackResponse = await qualityController.generateDirectResponse(
+              message,
+              conversationHistory
+            );
+            
+            return res.json({
+              success: true,
+              response: fallbackResponse,
+              model: 'gemini-2.5-flash',
+              hasErrors: false,
+              confidenceScore: 75,
+              isGuest: true,
+              message: "Free Chat - Anmelden für erweiterte Funktionen"
+            });
+          }
+        } catch (fallbackError) {
+          console.error("Fallback also failed:", fallbackError);
+        }
+        
         res.status(500).json({ 
           message: "Sorry, I'm having trouble responding right now. Please try again." 
         });

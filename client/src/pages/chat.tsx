@@ -11,6 +11,13 @@ import {
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
 import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { 
   PlusCircle, 
   Send, 
   User, 
@@ -21,13 +28,59 @@ import {
   MessageSquare,
   Crown,
   Zap,
-  Star
+  Star,
+  Brain,
+  Cpu
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Message, Conversation } from "@shared/schema";
+
+// Available AI Models
+const AI_MODELS = [
+  {
+    id: "gemini-2.5-flash",
+    name: "Gemini 2.5 Flash",
+    description: "Schnell & ausgewogen (Google)",
+    icon: Brain,
+    color: "text-blue-500",
+    tier: "free"
+  },
+  {
+    id: "gemini-2.5-pro", 
+    name: "Gemini 2.5 Pro",
+    description: "Erweiterte Fähigkeiten (Google)",
+    icon: Brain,
+    color: "text-blue-600",
+    tier: "ultra"
+  },
+  {
+    id: "deepseek/deepseek-r1:free",
+    name: "DeepSeek R1 (Free)",
+    description: "Reasoning & Logik (DeepSeek)",
+    icon: Cpu,
+    color: "text-purple-500", 
+    tier: "free"
+  },
+  {
+    id: "deepseek-chat",
+    name: "DeepSeek Chat",
+    description: "Kostengünstig & leistungsstark",
+    icon: Cpu,
+    color: "text-purple-600",
+    tier: "ultra"
+  },
+  {
+    id: "google/gemini-2.0-flash:free",
+    name: "Gemini 2.0 Flash (Free)",
+    description: "Neueste Version kostenlos",
+    icon: Brain,
+    color: "text-green-500",
+    tier: "free"
+  }
+];
 
 export default function Chat() {
   const { user, isAuthenticated } = useAuth();
@@ -36,6 +89,7 @@ export default function Chat() {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("gemini-2.5-flash");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   // Guest chat state
@@ -77,7 +131,8 @@ export default function Chat() {
       setIsGenerating(true);
       const response = await apiRequest("POST", `/api/conversations/${selectedConversationId}/messages`, {
         content,
-        role: "user"
+        role: "user",
+        model: selectedModel
       });
       return response.json();
     },
@@ -106,7 +161,10 @@ export default function Chat() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ 
+          message: content,
+          model: selectedModel 
+        }),
       });
       
       if (!response.ok) {
@@ -323,6 +381,56 @@ export default function Chat() {
       <div className="flex-1 flex flex-col">
         {(isAuthenticated && selectedConversationId) || !isAuthenticated ? (
           <>
+            {/* Model Selector Header */}
+            <div className="border-b border-gray-200 p-4">
+              <div className="max-w-3xl mx-auto flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Brain className="w-5 h-5 text-lopez-green" />
+                  <span className="text-sm font-medium text-gray-700">AI-Modell:</span>
+                  <Select value={selectedModel} onValueChange={setSelectedModel}>
+                    <SelectTrigger className="w-[280px]" data-testid="model-selector">
+                      <SelectValue placeholder="Modell auswählen" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AI_MODELS.map((model) => {
+                        const ModelIcon = model.icon;
+                        const userTier = (user as any)?.subscriptionTier || 'free';
+                        const canUse = model.tier === 'free' || 
+                                      (model.tier === 'ultra' && ['ultra', 'pro'].includes(userTier)) ||
+                                      (model.tier === 'pro' && userTier === 'pro');
+                        
+                        return (
+                          <SelectItem 
+                            key={model.id} 
+                            value={model.id}
+                            disabled={!canUse}
+                            data-testid={`model-option-${model.id}`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <ModelIcon className={`w-4 h-4 ${model.color}`} />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{model.name}</span>
+                                <span className="text-xs text-gray-500">{model.description}</span>
+                              </div>
+                              {!canUse && (
+                                <Badge variant="outline" className="text-xs ml-auto">
+                                  {model.tier === 'ultra' ? 'Ultra+' : 'Pro'}
+                                </Badge>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-500">
+                  <Cpu className="w-3 h-3" />
+                  <span>Multi-AI</span>
+                </div>
+              </div>
+            </div>
+            
             {/* Messages */}
             <ScrollArea className="flex-1 p-6">
               <div className="max-w-3xl mx-auto space-y-6">

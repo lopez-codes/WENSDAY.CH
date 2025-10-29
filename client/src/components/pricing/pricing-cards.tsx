@@ -22,7 +22,7 @@ const plans = [
   },
   {
     name: "Ultra Access",
-    price: 15,
+    price: 150,
     description: "Per month",
     popular: true,
     features: [
@@ -38,7 +38,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: 35,
+    price: 350,
     description: "Per month",
     features: [
       "Unlimited messages",

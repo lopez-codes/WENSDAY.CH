@@ -175,14 +175,14 @@ export const POSTFINANCE_PRODUCTS = {
   ultra: {
     name: 'Ultra Access',
     reference: 'ultra-access-chf',
-    price: 15.00, // CHF
+    price: 150.00, // CHF
     currency: 'CHF',
     description: 'Erweiterte AI-Funktionen mit 500 Nachrichten pro Tag'
   },
   pro: {
     name: 'Pro',
     reference: 'pro-unlimited-chf',
-    price: 35.00, // CHF
+    price: 350.00, // CHF
     currency: 'CHF',
     description: 'Unbegrenzte Nachrichten mit Premium Gemini 2.5 Pro Modell'
   }

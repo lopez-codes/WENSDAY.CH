@@ -17,6 +17,7 @@ import {
 import { AIQualityController } from "./ai-quality-control";
 import { WensdayCore } from "./wensday-core";
 import { aiProviderManager } from "./ai-providers";
+import { stripeAccounting } from "./stripe-accounting";
 
 // Stripe will be configured later
 let stripe: Stripe | null = null;
@@ -681,11 +682,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const userData = user[0];
           console.log(`Activating subscription for user ${userData.id} with transaction ${transactionId}`);
           
+          const tier = userData.subscriptionTier || 'ultra';
+          const product = POSTFINANCE_PRODUCTS[tier as 'ultra' | 'pro'];
+          
           // Activate the subscription based on transaction amount
-          // This is a simplified version - in production you'd want to verify the transaction details
-          await storage.updateUserSubscription(userData.id, userData.subscriptionTier || 'ultra', {
+          await storage.updateUserSubscription(userData.id, tier, {
             paymentMethod: 'postfinance'
           });
+
+          // Erstelle Stripe-Rechnung für Buchhaltung
+          try {
+            const invoice = await stripeAccounting.createInvoiceForPostFinancePayment({
+              userId: userData.id,
+              userEmail: userData.email || 'noreply@wensday.ch',
+              userName: `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || 'Kunde',
+              subscriptionTier: tier as 'ultra' | 'pro',
+              amount: product.price,
+              currency: product.currency,
+              paymentMethod: 'postfinance',
+              postfinanceTransactionId: transactionId,
+              description: `${product.name} - Monatliches Abonnement`
+            });
+            
+            console.log(`✅ Stripe-Rechnung erstellt für Buchhaltung: ${invoice.number}`);
+          } catch (error) {
+            console.error('⚠️ Stripe-Rechnung konnte nicht erstellt werden:', error);
+            // Subscription trotzdem aktiviert - nur Buchhaltung betroffen
+          }
         }
       }
 

@@ -1,0 +1,37 @@
+import { inject } from '@angular/core';
+import { CanActivateFn, Router } from '@angular/router';
+import { AuthService } from './auth.service';
+import { toObservable } from '@angular/core/rxjs-interop';
+import { filter, map, take } from 'rxjs';
+
+export const authGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  return toObservable(auth.isLoading).pipe(
+    filter(loading => !loading),
+    take(1),
+    map(() => {
+      if (auth.isAuthenticated()) return true;
+      router.navigate(['/']);
+      return false;
+    })
+  );
+};
+
+export const guestGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  return toObservable(auth.isLoading).pipe(
+    filter(loading => !loading),
+    take(1),
+    map(() => {
+      if (auth.isAuthenticated()) {
+        router.navigate(['/chat']);
+        return false;
+      }
+      return true;
+    })
+  );
+};

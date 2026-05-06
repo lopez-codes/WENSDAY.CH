@@ -1,78 +1,56 @@
-# wensday.ch MVP - Production Docker Configuration
-FROM node:18-alpine AS base
+# wensday.ch – Production Docker (Angular + Express)
+# Optimiert für Google Cloud Run
 
-# Set working directory
+FROM node:20-alpine AS base
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+
+# ── Build Stage ───────────────────────────────────────────────────────────────
+FROM node:20-alpine AS build
 WORKDIR /app
 
-# Copy package files
 COPY package*.json ./
-COPY functions/package*.json ./functions/
+RUN npm ci
 
-# Install dependencies
-RUN npm ci --only=production && \
-    cd functions && npm ci --only=production
-
-# Build stage
-FROM node:18-alpine AS build
-
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-COPY functions/package*.json ./functions/
-
-# Install all dependencies (including dev)
-RUN npm ci && cd functions && npm ci
-
-# Copy source code
 COPY . .
 
-# Build application
-RUN npm run build
+# Angular Frontend bauen
+RUN cd angular-client && \
+    node ../node_modules/@angular/cli/bin/ng.js build --configuration production
 
-# Production stage
-FROM node:18-alpine AS production
+# Express Backend bauen
+RUN npx esbuild server/index.ts \
+    --platform=node --packages=external --bundle \
+    --format=esm --outdir=dist
 
-# Create non-root user
+# ── Production Stage ──────────────────────────────────────────────────────────
+FROM node:20-alpine AS production
+
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S wensday -u 1001
 
-# Set working directory
 WORKDIR /app
 
-# Copy built application from build stage
+# Build-Artefakte kopieren
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/server ./server
 COPY --from=build /app/shared ./shared
-COPY --from=build /app/functions/lib ./functions/lib
+COPY --from=base  /app/node_modules ./node_modules
 
-# Copy production dependencies
-COPY --from=base /app/node_modules ./node_modules
-COPY --from=base /app/functions/node_modules ./functions/node_modules
-
-# Copy configuration files
 COPY package.json .
-COPY drizzle.config.ts .
-COPY firebase.json .
 
-# Change ownership to non-root user
 RUN chown -R wensday:nodejs /app
-
-# Switch to non-root user
 USER wensday
 
-# Expose port
-EXPOSE 5000
+# Cloud Run nutzt PORT env var (Standard: 8080)
+ENV PORT=8080
+EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node server/health-check.js
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget -qO- http://localhost:${PORT}/api/health || exit 1
 
-# Start application
-CMD ["npm", "start"]
+CMD ["node", "dist/index.js"]
 
-# Labels for metadata
 LABEL maintainer="dev.n.lopez@gmail.com" \
-      version="2.1" \
-      description="wensday.ch Business AI MVP Platform" \
-      org.opencontainers.image.source="https://github.com/lopez-codes/wensday-ch"
+      version="3.0" \
+      description="wensday.ch Swiss AI Platform – Angular + Express on Cloud Run"

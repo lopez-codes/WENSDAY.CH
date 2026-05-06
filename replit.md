@@ -77,16 +77,32 @@ dist/public/browser/     ← Angular build output (served by Express)
 - Simple, everyday language (Swiss German context)
 - Angular as frontend framework (migrated from React May 2026)
 
+## GCP Deployment
+
+- **Cloud Run**: `europe-west6` (Zürich), auto-deploy via `cloudbuild.yaml` oder `.github/workflows/deploy-gcp.yml`
+- **Dockerfile**: Multi-stage, baut Angular + Express, Port 8080 für Cloud Run
+- **Secrets**: Alle Keys via GCP Secret Manager (nicht env vars)
+- Setup-Anleitung: `docs/GCP_SETUP.md`
+- CORS erlaubt: `wensday.ch`, `lopez-codes.github.io`, plus `ALLOWED_ORIGINS` env var
+
+## Free Frontend (GitHub Pages)
+
+- Standalone HTML in `free-frontend/index.html` – kein Build nötig
+- Ruft `POST /api/chat/free` auf wensday.ch auf
+- Tageslimit (10) wird clientseitig via localStorage getrackt
+- Deploy: GitHub Pages via `.github/workflows/deploy-free-frontend.yml`
+
 ## Gotchas
 
 - After any Angular file change, must rebuild: `cd angular-client && ng build --configuration development`
 - Angular build output goes to `dist/public/browser/` (NOT `dist/public/`)
 - TypeScript must stay at 5.9+ for Angular 21 compatibility
 - Do NOT modify `server/vite.ts` to re-add Vite – Angular is served statically
-- React packages still in package.json but not used (can be cleaned up later)
+- CORS in `server/index.ts` – neue Origins in `allowedOrigins` Array eintragen
 
 ## Pointers
 
 - Angular docs: https://angular.dev
-- Angular Signals: https://angular.dev/guide/signals
-- Firebase migration plan: docs/FLUTTER_FIREBASE_MIGRATION.md
+- GCP Cloud Run: https://cloud.google.com/run/docs
+- GCP Setup: docs/GCP_SETUP.md
+- Free Frontend: free-frontend/README.md

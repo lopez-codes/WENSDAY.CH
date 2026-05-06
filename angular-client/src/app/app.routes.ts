@@ -17,6 +17,14 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/chat/chat.component').then(m => m.ChatComponent),
   },
   {
+    path: 'ecosystem',
+    loadComponent: () => import('./pages/ecosystem/ecosystem.component').then(m => m.EcosystemComponent),
+  },
+  {
+    path: 'crowdfunding',
+    loadComponent: () => import('./pages/crowdfunding/crowdfunding.component').then(m => m.CrowdfundingComponent),
+  },
+  {
     path: 'subscribe',
     loadComponent: () => import('./pages/subscribe/subscribe.component').then(m => m.SubscribeComponent),
   },

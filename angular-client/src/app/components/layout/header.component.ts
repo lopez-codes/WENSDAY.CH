@@ -21,9 +21,10 @@ import { AuthService } from '../../services/auth.service';
 
           <nav class="header-nav" [class.open]="mobileOpen()">
             <a routerLink="/chat" routerLinkActive="active" class="nav-link">Chat</a>
+            <a routerLink="/ecosystem" routerLinkActive="active" class="nav-link">AI-Ökosystem</a>
+            <a routerLink="/crowdfunding" routerLinkActive="active" class="nav-link">Crowdfunding</a>
             <a routerLink="/subscribe" routerLinkActive="active" class="nav-link">Preise</a>
             <a routerLink="/about" routerLinkActive="active" class="nav-link">Über uns</a>
-            <a routerLink="/contact" routerLinkActive="active" class="nav-link">Kontakt</a>
           </nav>
 
           <div class="header-actions">

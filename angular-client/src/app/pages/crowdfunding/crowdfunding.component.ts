@@ -28,7 +28,7 @@ import { FooterComponent } from '../../components/layout/footer.component';
             <p>
               Individuelle Leistungen sind auch <strong>ausserhalb der Pakete</strong> verfügbar –
               sprechen Sie uns direkt an:
-              <a href="mailto:dev.n.lopez@gmail.com">dev.n.lopez&#64;gmail.com</a>
+              <a href="mailto:nelson@lopez.codes">nelson&#64;lopez.codes</a>
             </p>
           </div>
         </div>

@@ -14,6 +14,25 @@ import { FooterComponent } from '../../components/layout/footer.component';
     <div class="crowd-page">
       <div class="container">
 
+        <!-- Wichtiger rechtlicher Hinweis -->
+        <div class="legal-notice">
+          <div class="legal-icon">⚠️</div>
+          <div class="legal-content">
+            <h3>Wichtiger Hinweis</h3>
+            <p>
+              Alle bisher erwirtschafteten Beträge sind ausschliesslich
+              <strong>Forschungszugriffs-Ressourcen</strong> (Research Access).
+              Es können damit bisher <strong>keine Löhne finanziert</strong> werden.
+              Wir sind dankbar für Investoren, die <strong>Bargeld einbringen</strong>.
+            </p>
+            <p>
+              Individuelle Leistungen sind auch <strong>ausserhalb der Pakete</strong> verfügbar –
+              sprechen Sie uns direkt an:
+              <a href="mailto:dev.n.lopez@gmail.com">dev.n.lopez&#64;gmail.com</a>
+            </p>
+          </div>
+        </div>
+
         <!-- Hero -->
         <div class="crowd-hero">
           <div class="live-badge">❤️ Crowdfunding Aktiv</div>
@@ -185,7 +204,23 @@ import { FooterComponent } from '../../components/layout/footer.component';
     <app-footer></app-footer>
   `,
   styles: [`
-    .crowd-page { padding: 3rem 0 5rem; background: var(--swiss-light); min-height: 100vh; }
+    .crowd-page { padding: 2rem 0 5rem; background: var(--swiss-light); min-height: 100vh; }
+    /* Rechtlicher Hinweis */
+    .legal-notice {
+      display: flex;
+      gap: 1rem;
+      background: #fffbeb;
+      border: 2px solid #f59e0b;
+      border-radius: 0.875rem;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+      align-items: flex-start;
+    }
+    .legal-icon { font-size: 1.5rem; flex-shrink: 0; margin-top: 0.125rem; }
+    .legal-content h3 { font-size: 1rem; font-weight: 700; color: #92400e; margin-bottom: 0.625rem; }
+    .legal-content p { font-size: 0.875rem; color: #78350f; line-height: 1.6; margin-bottom: 0.5rem; }
+    .legal-content p:last-child { margin-bottom: 0; }
+    .legal-content a { color: #92400e; font-weight: 600; }
     .crowd-hero { text-align: center; margin-bottom: 3rem; }
     .live-badge {
       display: inline-block;

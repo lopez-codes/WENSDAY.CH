@@ -508,6 +508,7 @@ export class ChatComponent implements OnInit {
   newMessage = '';
   selectedModel = 'gemini-2.5-flash';
   private lastSentContent = '';
+  private retryContext: { conversationId: string; model: string } | null = null;
 
   availableModels = computed(() => AI_MODELS);
 
@@ -595,6 +596,7 @@ export class ChatComponent implements OnInit {
     const content = this.newMessage.trim();
     this.newMessage = '';
     this.lastSentContent = content;
+    this.retryContext = null;
     this.streamError.set('');
 
     if (!this.auth.isAuthenticated()) {
@@ -649,6 +651,8 @@ export class ChatComponent implements OnInit {
       const msgs = await this.api.getMessages(convId!);
       this.messages.set(msgs);
     } catch (err: any) {
+      // Snapshot context so retry always targets the same conversation + model
+      this.retryContext = { conversationId: convId!, model: this.selectedModel };
       this.streamError.set(err?.message || 'Verbindung unterbrochen. Bitte versuche es erneut.');
     } finally {
       this.generating.set(false);
@@ -660,14 +664,15 @@ export class ChatComponent implements OnInit {
 
   async retryLastMessage() {
     const content = this.lastSentContent;
-    const convId = this.selectedId();
-    if (!content || !convId) return;
+    // Use frozen context from the failed request – ignores any post-failure navigation
+    const ctx = this.retryContext;
+    if (!content || !ctx) return;
 
     this.streamError.set('');
 
-    // Reload messages from DB – restores clean state without optimistic duplicate
+    // Reload messages from DB to restore clean state (removes optimistic user-message duplicate)
     try {
-      const msgs = await this.api.getMessages(convId);
+      const msgs = await this.api.getMessages(ctx.conversationId);
       this.messages.set(msgs);
     } catch { /* proceed anyway */ }
 
@@ -677,7 +682,7 @@ export class ChatComponent implements OnInit {
     try {
       this.streamingContent.set('');
       // skipUserMessage=true: user message is already persisted from the failed attempt
-      await this.api.streamChat(convId, content, this.selectedModel, (token) => {
+      await this.api.streamChat(ctx.conversationId, content, ctx.model, (token) => {
         if (this.generating()) {
           this.generating.set(false);
           this.isStreaming.set(true);
@@ -686,8 +691,9 @@ export class ChatComponent implements OnInit {
         this.scrollToBottom();
       }, true);
 
-      const msgs = await this.api.getMessages(convId);
+      const msgs = await this.api.getMessages(ctx.conversationId);
       this.messages.set(msgs);
+      this.retryContext = null;
     } catch (err: any) {
       this.streamError.set(err?.message || 'Verbindung unterbrochen. Bitte versuche es erneut.');
     } finally {

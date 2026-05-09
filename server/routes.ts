@@ -516,6 +516,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const lines = buf.split('\n');
           buf = lines.pop() ?? '';
           for (const line of lines) {
+            if (clientGone) return;
             if (!line.startsWith('data: ')) continue;
             const raw = line.slice(6).trim();
             if (raw === '[DONE]') return;
@@ -551,6 +552,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           config: { systemInstruction: systemPrompt, maxOutputTokens: 4096, temperature: 0.7 },
         });
         for await (const chunk of stream) {
+          if (clientGone) break;
           const token = chunk.text;
           if (token) { fullContent += token; sendSSE({ token }); }
         }
@@ -565,6 +567,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stream: true,
         });
         for await (const chunk of stream) {
+          if (clientGone) break;
           const token = chunk.choices[0]?.delta?.content || '';
           if (token) { fullContent += token; sendSSE({ token }); }
         }

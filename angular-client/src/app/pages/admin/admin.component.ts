@@ -6,7 +6,7 @@ import { AuthService } from '../../services/auth.service';
 import { AdminService, SystemStats, AdminUser, AdminLog, AiProvider } from '../../services/admin.service';
 import { ToastService } from '../../services/toast.service';
 
-type AdminTab = 'overview' | 'users' | 'providers' | 'core' | 'logs';
+type AdminTab = 'overview' | 'users' | 'providers' | 'core' | 'subscriptions' | 'logs';
 
 @Component({
   selector: 'app-admin',
@@ -48,6 +48,10 @@ type AdminTab = 'overview' | 'users' | 'providers' | 'core' | 'logs';
               <span class="nav-badge core">{{ coreUsers().length }}</span>
             }
           </button>
+          <button class="nav-item" [class.active]="activeTab() === 'subscriptions'" (click)="activeTab.set('subscriptions')">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Abonnements
+          </button>
           <button class="nav-item" [class.active]="activeTab() === 'logs'" (click)="activeTab.set('logs')">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             Logs
@@ -80,7 +84,8 @@ type AdminTab = 'overview' | 'users' | 'providers' | 'core' | 'logs';
               @case ('users') { <h1>Benutzer-Verwaltung</h1><p>Alle registrierten Nutzer verwalten</p> }
               @case ('providers') { <h1>KI-Provider</h1><p>AI-Anbieter konfigurieren</p> }
               @case ('core') { <h1>wensday-core</h1><p>Premium Developer Access</p> }
-              @case ('logs') { <h1>Admin-Logs</h1><p>Alle administrativen Aktionen</p> }
+              @case ('subscriptions') { <h1>Abonnements</h1><p>Abo-Übersicht und Verwaltung</p> }
+              @case ('logs') { <h1>Admin-Logs</h1><p>Alle administrativen Aktionen – wer hat was wann gemacht</p> }
             }
           </div>
           <button class="btn btn-ghost btn-sm" (click)="refreshAll()" [disabled]="loading()">
@@ -320,8 +325,103 @@ type AdminTab = 'overview' | 'users' | 'providers' | 'core' | 'logs';
             </div>
           }
 
+          <!-- ── SUBSCRIPTIONS TAB ── -->
+          @if (activeTab() === 'subscriptions') {
+            <div class="section-bar">
+              <p class="section-desc">Abo-Übersicht aller registrierten Nutzer</p>
+            </div>
+
+            @if (loading()) {
+              <div class="table-skeleton"></div>
+            } @else {
+              <!-- Subscription summary cards -->
+              <div class="stat-grid" style="margin-bottom:1.5rem">
+                <div class="stat-card">
+                  <div class="stat-icon users"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+                  <div>
+                    <div class="stat-value">{{ subCount('free') }}</div>
+                    <div class="stat-label">Free</div>
+                    <div class="stat-sub">10 Nachrichten/Tag</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon subs"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+                  <div>
+                    <div class="stat-value">{{ subCount('ultra') }}</div>
+                    <div class="stat-label">Ultra</div>
+                    <div class="stat-sub">CHF 150 / Monat</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon messages"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+                  <div>
+                    <div class="stat-value">{{ subCount('pro') }}</div>
+                    <div class="stat-label">Pro</div>
+                    <div class="stat-sub">CHF 350 / Monat</div>
+                  </div>
+                </div>
+                <div class="stat-card">
+                  <div class="stat-icon shield"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+                  <div>
+                    <div class="stat-value core-val">{{ subCount('wensday_core') }}</div>
+                    <div class="stat-label">wensday-core</div>
+                    <div class="stat-sub">API-Zugriff</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Full user table filtered/grouped by subscription -->
+              <div class="table-card">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Benutzer</th>
+                      <th>Email</th>
+                      <th>Abonnement</th>
+                      <th>Mitglied seit</th>
+                      <th>Aktionen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (u of usersSortedByTier(); track u.id) {
+                      <tr>
+                        <td>
+                          <div class="user-cell">
+                            <div class="user-avatar-sm">{{ (u.firstName?.[0] || u.email?.[0] || '?') | uppercase }}</div>
+                            <span class="user-name">{{ u.firstName || '' }} {{ u.lastName || '' }}</span>
+                          </div>
+                        </td>
+                        <td class="text-muted">{{ u.email || '—' }}</td>
+                        <td>
+                          <span class="badge" [class]="'tier-' + (u.subscriptionTier || 'free')">
+                            {{ u.subscriptionTier || 'free' }}
+                          </span>
+                        </td>
+                        <td class="text-muted">{{ fmtDate(u.createdAt) }}</td>
+                        <td>
+                          <button class="btn btn-xs btn-outline" (click)="openEdit(u)">Abo ändern</button>
+                        </td>
+                      </tr>
+                    }
+                    @empty {
+                      <tr><td colspan="5" class="empty-row">Keine Benutzer vorhanden</td></tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+
           <!-- ── LOGS TAB ── -->
           @if (activeTab() === 'logs') {
+            <div class="section-bar">
+              <p class="section-desc">{{ logs().length }} Einträge (Seite {{ logPage() + 1 }})</p>
+              <div style="display:flex;gap:0.5rem">
+                <button class="btn btn-sm btn-outline" (click)="prevLogPage()" [disabled]="logPage() === 0 || loading()">← Zurück</button>
+                <button class="btn btn-sm btn-outline" (click)="nextLogPage()" [disabled]="logs().length < logPageSize || loading()">Weiter →</button>
+              </div>
+            </div>
+
             @if (loading()) {
               <div class="table-skeleton"></div>
             } @else {
@@ -330,8 +430,9 @@ type AdminTab = 'overview' | 'users' | 'providers' | 'core' | 'logs';
                   <thead>
                     <tr>
                       <th>Zeitpunkt</th>
-                      <th>Aktion</th>
-                      <th>Benutzer-ID</th>
+                      <th>Admin (wer)</th>
+                      <th>Aktion (was)</th>
+                      <th>Ziel-User</th>
                       <th>Details</th>
                     </tr>
                   </thead>
@@ -339,16 +440,23 @@ type AdminTab = 'overview' | 'users' | 'providers' | 'core' | 'logs';
                     @for (log of logs(); track log.id) {
                       <tr>
                         <td class="text-muted log-time">{{ fmtDateTime(log.createdAt) }}</td>
+                        <td class="text-muted mono">{{ log.adminId }}</td>
                         <td><span class="log-action">{{ log.action }}</span></td>
                         <td class="text-muted mono">{{ log.targetUserId || '—' }}</td>
                         <td class="text-muted log-details">{{ fmtDetails(log.details) }}</td>
                       </tr>
                     }
                     @empty {
-                      <tr><td colspan="4" class="empty-row">Keine Log-Einträge vorhanden</td></tr>
+                      <tr><td colspan="5" class="empty-row">Keine Log-Einträge vorhanden</td></tr>
                     }
                   </tbody>
                 </table>
+              </div>
+
+              <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem">
+                <button class="btn btn-sm btn-outline" (click)="prevLogPage()" [disabled]="logPage() === 0">← Zurück</button>
+                <span style="font-size:0.8rem;color:#64748b;align-self:center">Seite {{ logPage() + 1 }}</span>
+                <button class="btn btn-sm btn-outline" (click)="nextLogPage()" [disabled]="logs().length < logPageSize">Weiter →</button>
               </div>
             }
           }
@@ -804,6 +912,9 @@ export class AdminComponent implements OnInit {
   providers = signal<AiProvider[]>([]);
   logs = signal<AdminLog[]>([]);
 
+  logPageSize = 50;
+  logPage = signal(0);
+
   userSearch = '';
   editUser = signal<AdminUser | null>(null);
   editFirstName = '';
@@ -822,6 +933,17 @@ export class AdminComponent implements OnInit {
     );
   });
 
+  usersSortedByTier = computed(() => {
+    const order: Record<string, number> = { wensday_core: 0, pro: 1, ultra: 2, free: 3 };
+    return [...this.users()].sort((a, b) =>
+      (order[a.subscriptionTier || 'free'] ?? 3) - (order[b.subscriptionTier || 'free'] ?? 3)
+    );
+  });
+
+  subCount(tier: string): number {
+    return this.users().filter(u => (u.subscriptionTier || 'free') === tier).length;
+  }
+
   async ngOnInit() {
     await this.refreshAll();
   }
@@ -833,7 +955,7 @@ export class AdminComponent implements OnInit {
         this.adminSvc.getStats(),
         this.adminSvc.getUsers(),
         this.adminSvc.getProviders(),
-        this.adminSvc.getLogs(),
+        this.adminSvc.getLogs(this.logPageSize, this.logPage() * this.logPageSize),
       ]);
       if (stats.status === 'fulfilled')     this.stats.set(stats.value);
       if (users.status === 'fulfilled')     this.users.set(users.value);
@@ -842,6 +964,27 @@ export class AdminComponent implements OnInit {
     } finally {
       this.loading.set(false);
     }
+  }
+
+  async loadLogs() {
+    this.loading.set(true);
+    try {
+      const data = await this.adminSvc.getLogs(this.logPageSize, this.logPage() * this.logPageSize);
+      this.logs.set(data);
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  async prevLogPage() {
+    if (this.logPage() === 0) return;
+    this.logPage.update(p => p - 1);
+    await this.loadLogs();
+  }
+
+  async nextLogPage() {
+    this.logPage.update(p => p + 1);
+    await this.loadLogs();
   }
 
   async toggleCore(u: AdminUser) {

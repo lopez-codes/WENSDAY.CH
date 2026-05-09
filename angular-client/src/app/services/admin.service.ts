@@ -27,9 +27,11 @@ export interface AdminUser {
 
 export interface AdminLog {
   id: string;
+  adminId: string;
   action: string;
   targetUserId?: string;
   details?: unknown;
+  ipAddress?: string;
   createdAt: string;
 }
 
@@ -85,7 +87,9 @@ export class AdminService {
     return firstValueFrom(this.http.post('/api/admin/init-default-providers', {}));
   }
 
-  getLogs(): Promise<AdminLog[]> {
-    return firstValueFrom(this.http.get<AdminLog[]>('/api/admin/logs'));
+  getLogs(limit = 50, offset = 0): Promise<AdminLog[]> {
+    return firstValueFrom(
+      this.http.get<AdminLog[]>(`/api/admin/logs?limit=${limit}&offset=${offset}`)
+    );
   }
 }

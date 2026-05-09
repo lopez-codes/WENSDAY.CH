@@ -482,14 +482,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let fullContent = '';
 
-      // Only native Gemini model IDs (e.g. "gemini-2.5-flash") use Google SDK streaming.
-      // OpenRouter-style IDs like "google/gemini-2.0-flash:free" go through provider fallback.
-      const isGemini = selectedModel.startsWith('gemini-');
-      const isOpenAI = selectedModel.startsWith('gpt');
+      // Helper: parse OpenAI-compatible SSE stream (DeepSeek, OpenRouter)
+      const streamOpenAICompat = async (
+        url: string,
+        extraHeaders: Record<string, string>,
+        body: object
+      ): Promise<void> => {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...extraHeaders },
+          body: JSON.stringify({ ...body, stream: true }),
+        });
+        if (!response.ok) {
+          const errText = await response.text().catch(() => response.status.toString());
+          throw new Error(`API error ${response.status}: ${errText}`);
+        }
+        const reader = response.body!.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n');
+          buf = lines.pop() ?? '';
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const raw = line.slice(6).trim();
+            if (raw === '[DONE]') return;
+            const data = JSON.parse(raw);
+            const token = data.choices?.[0]?.delta?.content || '';
+            if (token) { fullContent += token; sendSSE({ token }); }
+          }
+        }
+      };
 
-      if (isGemini && process.env.GEMINI_API_KEY) {
+      // ── Route to correct streaming provider ──────────────────────────────────
+      // Native Google Gemini SDK (model IDs like "gemini-2.5-flash", "gemini-2.5-pro")
+      const isNativeGemini = selectedModel.startsWith('gemini-') && process.env.GEMINI_API_KEY;
+      // Native OpenAI SDK (model IDs like "gpt-4o", "gpt-5")
+      const isNativeOpenAI = selectedModel.startsWith('gpt') && process.env.OPENAI_API_KEY;
+      // DeepSeek direct API (model IDs like "deepseek-chat", "deepseek-r1")
+      const isDeepSeek = selectedModel.startsWith('deepseek-') && process.env.DEEPSEEK_API_KEY;
+      // OpenRouter (models with "/" or ":" like "google/gemini-2.0-flash:free", "deepseek/deepseek-r1:free")
+      const isOpenRouter = (selectedModel.includes('/') || selectedModel.includes(':')) && process.env.OPENROUTER_API_KEY;
+
+      const chatMessages = [
+        { role: 'system' as const, content: systemPrompt },
+        ...history.map(m => ({ role: m.role, content: m.content })),
+      ];
+
+      if (isNativeGemini) {
         const { GoogleGenAI } = await import('@google/genai');
-        const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
         const prompt = history.map(m => `${m.role}: ${m.content}`).join('\n\n');
         const stream = await client.models.generateContentStream({
           model: selectedModel,
@@ -500,12 +545,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const token = chunk.text;
           if (token) { fullContent += token; sendSSE({ token }); }
         }
-      } else if (isOpenAI && process.env.OPENAI_API_KEY) {
+      } else if (isNativeOpenAI) {
         const { default: OpenAI } = await import('openai');
         const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
         const stream = await client.chat.completions.create({
           model: selectedModel,
-          messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content }))],
+          messages: chatMessages,
           max_tokens: 4096,
           temperature: 0.7,
           stream: true,
@@ -514,14 +559,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const token = chunk.choices[0]?.delta?.content || '';
           if (token) { fullContent += token; sendSSE({ token }); }
         }
+      } else if (isDeepSeek) {
+        await streamOpenAICompat(
+          'https://api.deepseek.com/chat/completions',
+          { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
+          { model: selectedModel, messages: chatMessages, max_tokens: 4096, temperature: 0.7 }
+        );
+      } else if (isOpenRouter) {
+        await streamOpenAICompat(
+          'https://openrouter.ai/api/v1/chat/completions',
+          {
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            'HTTP-Referer': process.env.REPLIT_DOMAINS?.split(',')[0] || 'https://wensday.ch',
+            'X-Title': 'wensday.ch - Swiss AI Platform',
+          },
+          { model: selectedModel, messages: chatMessages, max_tokens: 4096, temperature: 0.7 }
+        );
       } else {
+        // Last-resort fallback: non-streaming provider (e.g. HuggingFace, unconfigured providers)
+        // This path is only reached for providers without streaming APIs or missing API keys.
         const response = await aiProviderManager.generateResponse(selectedModel, history, { systemPrompt, maxTokens: 4096, temperature: 0.7 });
         fullContent = response;
-        const words = fullContent.split(' ');
-        for (const word of words) {
-          sendSSE({ token: word + ' ' });
-          await new Promise(r => setTimeout(r, 12));
-        }
+        // Emit as single block – no fake delay, explicit degraded mode
+        sendSSE({ token: fullContent });
       }
 
       const aiMessage = await storage.createMessage({

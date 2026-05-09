@@ -100,6 +100,6 @@ export class ApiService {
         if (typeof ev['error'] === 'string') throw new Error(ev['error']);
       }
     }
-    return { messageId: '', model };
+    throw new Error('Stream unterbrochen: kein done-Event empfangen.');
   }
 }

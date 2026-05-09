@@ -85,13 +85,19 @@ export class ApiService {
       buffer = lines.pop() ?? '';
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let data: any;
-        try { data = JSON.parse(line.slice(6)); } catch { continue; }
-        if (data.ackUserPersisted) onAck?.();
-        if (data.token) onToken(data.token);
-        if (data.done) return { messageId: data.messageId, model: data.model };
-        if (data.error) throw new Error(data.error);
+        let parsed: unknown;
+        try { parsed = JSON.parse(line.slice(6)); } catch { continue; }
+        if (!parsed || typeof parsed !== 'object') continue;
+        const ev = parsed as Record<string, unknown>;
+        if (ev['ackUserPersisted'] === true) { onAck?.(); continue; }
+        if (typeof ev['token'] === 'string') { onToken(ev['token']); continue; }
+        if (ev['done'] === true) {
+          return {
+            messageId: typeof ev['messageId'] === 'string' ? ev['messageId'] : '',
+            model:     typeof ev['model']     === 'string' ? ev['model']     : model,
+          };
+        }
+        if (typeof ev['error'] === 'string') throw new Error(ev['error']);
       }
     }
     return { messageId: '', model };

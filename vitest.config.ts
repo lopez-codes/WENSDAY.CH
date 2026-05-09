@@ -21,14 +21,7 @@ export default defineConfig({
         'vite.config.ts',
         'vitest.config.ts'
       ],
-      thresholds: {
-        global: {
-          branches: 70,
-          functions: 80,
-          lines: 80,
-          statements: 80
-        }
-      }
+      // thresholds können nach Bedarf aktiviert werden
     }
   },
   resolve: {

@@ -645,19 +645,16 @@ export class ChatComponent implements OnInit {
 
     try {
       this.streamingContent.set('');
-      let firstToken = true;
       await this.api.streamChat(convId!, content, this.selectedModel, (token) => {
         if (this.generating()) {
           this.generating.set(false);
           this.isStreaming.set(true);
         }
-        if (firstToken) {
-          // First token proves server saved user message and started streaming
-          firstToken = false;
-          userPersisted = true;
-        }
         this.streamingContent.update(c => c + token);
         this.scrollToBottom();
+      }, false, () => {
+        // ackUserPersisted: server confirmed user message was saved
+        userPersisted = true;
       });
 
       const msgs = await this.api.getMessages(convId!);
@@ -701,7 +698,7 @@ export class ChatComponent implements OnInit {
         }
         this.streamingContent.update(c => c + token);
         this.scrollToBottom();
-      }, ctx.userPersisted);
+      }, ctx.userPersisted, undefined);
 
       const msgs = await this.api.getMessages(ctx.conversationId);
       this.messages.set(msgs);

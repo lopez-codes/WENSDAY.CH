@@ -473,6 +473,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!skipUserMessage) {
         await storage.createMessage({ conversationId, role: 'user', content });
       }
+      // Immediately signal that user message is persisted – client uses this for safe retry
+      sendSSE({ ackUserPersisted: true });
 
       const allMessages = await storage.getConversationMessages(conversationId);
       const history = allMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));

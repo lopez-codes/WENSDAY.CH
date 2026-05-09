@@ -58,7 +58,8 @@ export class ApiService {
     content: string,
     model: string,
     onToken: (token: string) => void,
-    skipUserMessage = false
+    skipUserMessage = false,
+    onAck?: () => void
   ): Promise<{ messageId: string; model: string }> {
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
@@ -85,6 +86,7 @@ export class ApiService {
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
         const data = JSON.parse(line.slice(6));
+        if (data.ackUserPersisted) onAck?.();
         if (data.token) onToken(data.token);
         if (data.done) return { messageId: data.messageId, model: data.model };
         if (data.error) throw new Error(data.error);

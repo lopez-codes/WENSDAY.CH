@@ -97,7 +97,7 @@ const AI_MODELS = [
             </a>
             <div class="model-bar-divider"></div>
             <label class="model-label">🧠 KI-Modell:</label>
-            <select class="select model-select" [(ngModel)]="selectedModel">
+            <select class="select model-select" [(ngModel)]="selectedModel" [disabled]="generating() || isStreaming()">
               @for (model of availableModels(); track model.id) {
                 <option [value]="model.id" [disabled]="!canUseModel(model.tier)">
                   {{ model.icon }} {{ model.name }}
@@ -190,6 +190,10 @@ const AI_MODELS = [
         } @else {
           <!-- Welcome screen -->
           <div class="welcome-screen">
+            <a routerLink="/home" class="back-btn welcome-back-btn" title="Zur Startseite">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+              Home
+            </a>
             <div class="welcome-icon">🧠</div>
             <h2>Willkommen bei wensday.ch</h2>
             <p>Starten Sie ein neues Gespräch oder wählen Sie eine bestehende Unterhaltung.</p>
@@ -508,7 +512,7 @@ export class ChatComponent implements OnInit {
   newMessage = '';
   selectedModel = 'gemini-2.5-flash';
   private lastSentContent = '';
-  private retryContext: { conversationId: string; model: string } | null = null;
+  private retryContext: { conversationId: string; model: string; userPersisted: boolean } | null = null;
 
   availableModels = computed(() => AI_MODELS);
 
@@ -637,12 +641,20 @@ export class ChatComponent implements OnInit {
     this.generating.set(true);
     this.scrollToBottom();
 
+    let userPersisted = false;
+
     try {
       this.streamingContent.set('');
+      let firstToken = true;
       await this.api.streamChat(convId!, content, this.selectedModel, (token) => {
         if (this.generating()) {
           this.generating.set(false);
           this.isStreaming.set(true);
+        }
+        if (firstToken) {
+          // First token proves server saved user message and started streaming
+          firstToken = false;
+          userPersisted = true;
         }
         this.streamingContent.update(c => c + token);
         this.scrollToBottom();
@@ -652,7 +664,7 @@ export class ChatComponent implements OnInit {
       this.messages.set(msgs);
     } catch (err: any) {
       // Snapshot context so retry always targets the same conversation + model
-      this.retryContext = { conversationId: convId!, model: this.selectedModel };
+      this.retryContext = { conversationId: convId!, model: this.selectedModel, userPersisted };
       this.streamError.set(err?.message || 'Verbindung unterbrochen. Bitte versuche es erneut.');
     } finally {
       this.generating.set(false);
@@ -681,7 +693,7 @@ export class ChatComponent implements OnInit {
 
     try {
       this.streamingContent.set('');
-      // skipUserMessage=true: user message is already persisted from the failed attempt
+      // skipUserMessage only when user message was already persisted in the failed attempt
       await this.api.streamChat(ctx.conversationId, content, ctx.model, (token) => {
         if (this.generating()) {
           this.generating.set(false);
@@ -689,7 +701,7 @@ export class ChatComponent implements OnInit {
         }
         this.streamingContent.update(c => c + token);
         this.scrollToBottom();
-      }, true);
+      }, ctx.userPersisted);
 
       const msgs = await this.api.getMessages(ctx.conversationId);
       this.messages.set(msgs);

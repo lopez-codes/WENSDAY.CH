@@ -19,7 +19,7 @@ export const APP_CONFIG = {
 
   // ── URLs ──────────────────────────────────────────────────────────────
   siteUrl:       'https://wensday.ch',
-  githubUrl:     'https://github.com/lopez-codes/wensday-ch',
+  githubUrl:     'https://github.com/lopez-codes/WENSDAY.CH',
 
   // ── Product description ───────────────────────────────────────────────
   description:   'Swiss AI chat platform for professional research and independent analysis.',

@@ -85,7 +85,9 @@ export class ApiService {
       buffer = lines.pop() ?? '';
       for (const line of lines) {
         if (!line.startsWith('data: ')) continue;
-        const data = JSON.parse(line.slice(6));
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let data: any;
+        try { data = JSON.parse(line.slice(6)); } catch { continue; }
         if (data.ackUserPersisted) onAck?.();
         if (data.token) onToken(data.token);
         if (data.done) return { messageId: data.messageId, model: data.model };

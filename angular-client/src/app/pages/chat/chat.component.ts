@@ -91,7 +91,7 @@ const AI_MODELS = [
         @if (showChat()) {
           <!-- Model selector + back navigation -->
           <div class="model-bar">
-            <a routerLink="/home" class="back-btn" title="Zur Startseite">
+            <a [routerLink]="auth.isAuthenticated() ? '/home' : '/'" class="back-btn" title="Zur Startseite">
               <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
               Home
             </a>

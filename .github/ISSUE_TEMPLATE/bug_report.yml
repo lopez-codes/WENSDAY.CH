@@ -1,0 +1,76 @@
+name: Bug Report
+description: Einen Bug melden
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: ["lopez-codes"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Danke für dein Bug-Report! Bitte fülle das Formular so vollständig wie möglich aus.
+        Bei sicherheitsrelevanten Bugs bitte **nicht** hier melden – stattdessen direkt an nelson@lopez.codes.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Beschreibung
+      description: Was ist passiert? Was hast du erwartet?
+      placeholder: "Wenn ich auf ... klicke, passiert ... anstatt ..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Schritte zur Reproduktion
+      description: Wie kann der Bug reproduziert werden?
+      value: |
+        1. Gehe zu '...'
+        2. Klicke auf '...'
+        3. Scrolle zu '...'
+        4. Fehler erscheint
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Erwartetes Verhalten
+      description: Was sollte eigentlich passieren?
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots / Logs
+      description: Falls vorhanden, Screenshots oder Fehlerlogs einfügen.
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Umgebung
+      options:
+        - Production (wensday.ch)
+        - Local Development
+        - Docker
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / OS
+      placeholder: "z.B. Chrome 124, macOS 14"
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: Ich habe nach ähnlichen Issues gesucht
+          required: true
+        - label: Ich verwende die aktuellste Version
+          required: false

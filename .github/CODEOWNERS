@@ -1,0 +1,16 @@
+# Code Owners – werden automatisch als Reviewer für PRs angefragt
+# Mehr Info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner für alles
+* @lopez-codes
+
+# Angular Frontend
+angular-client/ @lopez-codes
+
+# Backend / API
+server/ @lopez-codes
+
+# Security-relevante Dateien – Review immer erforderlich
+SECURITY.md @lopez-codes
+.github/workflows/ @lopez-codes
+Dockerfile @lopez-codes

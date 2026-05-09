@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Direkter Support
+    url: mailto:nelson@lopez.codes
+    about: Direkte Anfragen, Sicherheitsprobleme oder kommerzielle Lizenzierung
+  - name: wensday.ch Platform
+    url: https://wensday.ch
+    about: Zur Live-Plattform

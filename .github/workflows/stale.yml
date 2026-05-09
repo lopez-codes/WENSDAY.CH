@@ -1,0 +1,38 @@
+name: Stale Issues & PRs
+
+on:
+  schedule:
+    - cron: '0 8 * * 1'   # Jeden Montag 08:00 UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    name: Mark stale
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          stale-issue-message: |
+            Dieses Issue wurde seit 30 Tagen nicht aktualisiert und wird als **stale** markiert.
+            Es wird in weiteren 7 Tagen automatisch geschlossen, falls keine Aktivität stattfindet.
+            Bei Fragen: nelson@lopez.codes
+          stale-pr-message: |
+            Dieser PR wurde seit 14 Tagen nicht aktualisiert und wird als **stale** markiert.
+            Er wird in weiteren 7 Tagen automatisch geschlossen, falls keine Aktivität stattfindet.
+          close-issue-message: |
+            Dieses Issue wurde automatisch geschlossen (keine Aktivität seit 37 Tagen).
+            Bitte neu eröffnen oder melden bei nelson@lopez.codes.
+          close-pr-message: |
+            Dieser PR wurde automatisch geschlossen (keine Aktivität seit 21 Tagen).
+          days-before-issue-stale: 30
+          days-before-pr-stale: 14
+          days-before-issue-close: 7
+          days-before-pr-close: 7
+          stale-issue-label: stale
+          stale-pr-label: stale
+          exempt-issue-labels: 'pinned,security,bug'
+          exempt-pr-labels: 'pinned,security'

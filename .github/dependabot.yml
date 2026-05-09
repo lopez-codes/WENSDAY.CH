@@ -1,0 +1,70 @@
+version: 2
+updates:
+  # npm – Root-Projekt
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 10
+    groups:
+      angular:
+        patterns: ["@angular*", "@angular-devkit*"]
+      ai-sdks:
+        patterns: ["openai", "@google/genai", "@anthropic-ai/*"]
+      security-patch:
+        update-types: ["patch"]
+    ignore:
+      - dependency-name: "typescript"
+        versions: [">=6.0.0"]
+    labels:
+      - "dependencies"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps)"
+
+  # npm – Angular Client
+  - package-ecosystem: npm
+    directory: /angular-client
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:30"
+      timezone: Europe/Zurich
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+      - "automated"
+    commit-message:
+      prefix: "chore(deps/frontend)"
+
+  # Docker Base Image
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Zurich
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "chore(docker)"
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+      timezone: Europe/Zurich
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(actions)"

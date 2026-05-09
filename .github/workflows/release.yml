@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (z.B. v1.2.0)'
+        required: true
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  # ── GitHub Release erstellen ───────────────────────────────────────────
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Angular
+        run: |
+          cd angular-client
+          node ../node_modules/@angular/cli/bin/ng.js build --configuration production
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Build backend
+        run: |
+          npx esbuild server/index.ts \
+            --platform=node \
+            --packages=external \
+            --bundle \
+            --format=esm \
+            --outdir=dist
+
+      - name: Generate changelog
+        id: changelog
+        uses: orhun/git-cliff-action@v3
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+        continue-on-error: true
+
+      - name: Create release archive
+        run: |
+          tar -czf wensday-ch-${{ github.ref_name }}.tar.gz \
+            dist/ \
+            shared/ \
+            package.json \
+            --exclude='*.test.*'
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## wensday.ch ${{ github.ref_name }}
+
+            Swiss AI Chat Platform Template – Angular 21 + Express + Cloud Run
+
+            ### Was ist neu
+            ${{ steps.changelog.outputs.content || '- Siehe Commits für Details' }}
+
+            ### Template nutzen
+            1. Repo forken
+            2. `angular-client/src/app/config/app.config.ts` anpassen
+            3. `.env` aus `.env.example` erstellen
+            4. `npm run dev` starten
+
+            ### Kontakt
+            📧 nelson@lopez.codes
+            🌐 https://wensday.ch
+          files: |
+            wensday-ch-${{ github.ref_name }}.tar.gz
+          generate_release_notes: true
+          make_latest: true
+
+  # ── Nach Release: auf Cloud Run deployen ──────────────────────────────
+  deploy-release:
+    name: Deploy Release
+    needs: release
+    uses: ./.github/workflows/cd.yml
+    secrets: inherit

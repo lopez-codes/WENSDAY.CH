@@ -434,6 +434,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ── SSE Streaming Chat ──────────────────────────────────────────────────────
+  app.post('/api/chat/stream', isAuthenticated, async (req: any, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const sendSSE = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      if (!user) { sendSSE({ error: 'Benutzer nicht gefunden' }); return res.end(); }
+
+      const limit = RATE_LIMITS[user.subscriptionTier as keyof typeof RATE_LIMITS] || RATE_LIMITS.free;
+      if (limit > 0 && (user.dailyMessageCount || 0) >= limit) {
+        sendSSE({ error: `Tageslimit erreicht (${limit} Nachrichten). Bitte upgraden.` });
+        return res.end();
+      }
+
+      const { content, conversationId, model: requestedModel } = req.body;
+      if (!content || typeof content !== 'string') { sendSSE({ error: 'Nachricht fehlt' }); return res.end(); }
+
+      const conversation = await storage.getConversation(conversationId);
+      if (!conversation || conversation.userId !== userId) {
+        sendSSE({ error: 'Konversation nicht gefunden' }); return res.end();
+      }
+
+      await storage.createMessage({ conversationId, role: 'user', content });
+
+      const allMessages = await storage.getConversationMessages(conversationId);
+      const history = allMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+      const userTier = user.subscriptionTier || 'free';
+      const allowedModels: Record<string, string[]> = {
+        free:  ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'gpt-4o-mini'],
+        ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o'],
+        pro:   ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o', 'gpt-5'],
+        wensday_core: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o', 'gpt-5'],
+      };
+      const selectedModel = requestedModel && (allowedModels[userTier] || allowedModels.free).includes(requestedModel)
+        ? requestedModel : 'gemini-2.5-flash';
+
+      const systemPrompt = `Sie sind ein professioneller KI-Assistent für wensday.ch, eine Schweizer Business-AI-Plattform. Antworten Sie präzise, hilfreich und geschäftsorientiert auf Deutsch. Branche: ${user.industry || 'Allgemein'}, Unternehmensgröße: ${user.companySize || 'KMU'}`;
+
+      let fullContent = '';
+
+      const isGemini = selectedModel.startsWith('gemini') || selectedModel.includes('gemini');
+      const isOpenAI = selectedModel.startsWith('gpt');
+
+      if (isGemini && process.env.GEMINI_API_KEY) {
+        const { GoogleGenAI } = await import('@google/genai');
+        const client = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+        const prompt = history.map(m => `${m.role}: ${m.content}`).join('\n\n');
+        const stream = await client.models.generateContentStream({
+          model: selectedModel,
+          contents: prompt,
+          config: { systemInstruction: systemPrompt, maxOutputTokens: 4096, temperature: 0.7 },
+        });
+        for await (const chunk of stream) {
+          const token = chunk.text;
+          if (token) { fullContent += token; sendSSE({ token }); }
+        }
+      } else if (isOpenAI && process.env.OPENAI_API_KEY) {
+        const { default: OpenAI } = await import('openai');
+        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const stream = await client.chat.completions.create({
+          model: selectedModel,
+          messages: [{ role: 'system', content: systemPrompt }, ...history.map(m => ({ role: m.role, content: m.content }))],
+          max_tokens: 4096,
+          temperature: 0.7,
+          stream: true,
+        });
+        for await (const chunk of stream) {
+          const token = chunk.choices[0]?.delta?.content || '';
+          if (token) { fullContent += token; sendSSE({ token }); }
+        }
+      } else {
+        const response = await aiProviderManager.generateResponse(selectedModel, history, { systemPrompt, maxTokens: 4096, temperature: 0.7 });
+        fullContent = response;
+        const words = fullContent.split(' ');
+        for (const word of words) {
+          sendSSE({ token: word + ' ' });
+          await new Promise(r => setTimeout(r, 12));
+        }
+      }
+
+      const aiMessage = await storage.createMessage({
+        conversationId, role: 'assistant', content: fullContent, aiModel: selectedModel,
+        hasErrors: false, errorDetails: null, confidenceScore: 85,
+        businessCategory: user.industry || 'general', needsReview: false, factChecked: true, sources: []
+      });
+      await storage.incrementDailyMessageCount(userId);
+      sendSSE({ done: true, messageId: aiMessage.id, model: selectedModel });
+    } catch (error: any) {
+      console.error('SSE stream error:', error);
+      sendSSE({ error: error.message || 'Streaming-Fehler' });
+    } finally {
+      res.end();
+    }
+  });
+  // ────────────────────────────────────────────────────────────────────────────
+
   // Delete conversation route
   app.delete('/api/conversations/:id', isAuthenticated, async (req: any, res) => {
     try {

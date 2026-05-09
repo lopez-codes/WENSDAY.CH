@@ -52,4 +52,43 @@ export class ApiService {
   async freeChat(message: string, model = 'gemini-2.5-flash'): Promise<{ response: string }> {
     return firstValueFrom(this.http.post<{ response: string }>('/api/chat/free', { message, model }));
   }
+
+  async streamChat(
+    conversationId: string,
+    content: string,
+    model: string,
+    onToken: (token: string) => void
+  ): Promise<{ messageId: string; model: string }> {
+    const response = await fetch('/api/chat/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ conversationId, content, model }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.message || `HTTP ${response.status}`);
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const data = JSON.parse(line.slice(6));
+        if (data.token) onToken(data.token);
+        if (data.done) return { messageId: data.messageId, model: data.model };
+        if (data.error) throw new Error(data.error);
+      }
+    }
+    return { messageId: '', model };
+  }
 }

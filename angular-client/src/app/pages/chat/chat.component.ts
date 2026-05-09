@@ -89,8 +89,13 @@ const AI_MODELS = [
       <!-- Main Chat -->
       <main class="chat-main">
         @if (showChat()) {
-          <!-- Model selector -->
+          <!-- Model selector + back navigation -->
           <div class="model-bar">
+            <a routerLink="/home" class="back-btn" title="Zur Startseite">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+              Home
+            </a>
+            <div class="model-bar-divider"></div>
             <label class="model-label">🧠 KI-Modell:</label>
             <select class="select model-select" [(ngModel)]="selectedModel">
               @for (model of availableModels(); track model.id) {
@@ -142,6 +147,25 @@ const AI_MODELS = [
                 </div>
               </div>
             }
+
+            @if (isStreaming()) {
+              <div class="message-row">
+                <div class="msg-avatar-icon ai">W</div>
+                <div class="ai-bubble message-bubble streaming-bubble">
+                  <p class="msg-text">{{ streamingContent() }}<span class="stream-cursor">▎</span></p>
+                  <div class="msg-meta"><span class="msg-model">{{ selectedModel }}</span></div>
+                </div>
+              </div>
+            }
+
+            @if (streamError()) {
+              <div class="stream-error-row">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>{{ streamError() }}</span>
+                <button class="btn-retry" (click)="retryLastMessage()">Wiederholen</button>
+              </div>
+            }
+
             <div #bottomAnchor></div>
           </div>
 
@@ -311,6 +335,22 @@ const AI_MODELS = [
       border-bottom: 1px solid var(--border);
       background: white;
     }
+    .back-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--swiss-gray);
+      text-decoration: none;
+      padding: 0.375rem 0.625rem;
+      border-radius: 6px;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .back-btn:hover { background: #f1f5f9; color: var(--foreground); }
+    .model-bar-divider { width: 1px; background: var(--border); height: 1.25rem; flex-shrink: 0; }
     .model-label { font-size: 0.875rem; font-weight: 500; color: var(--swiss-gray); white-space: nowrap; }
     .model-select { width: 260px; }
     .model-info { font-size: 0.75rem; color: var(--swiss-gray); margin-left: auto; }
@@ -383,6 +423,39 @@ const AI_MODELS = [
       0%, 100% { transform: translateY(0); opacity: 0.4; }
       50% { transform: translateY(-4px); opacity: 1; }
     }
+    /* Streaming cursor */
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .stream-cursor { animation: blink 0.9s ease-in-out infinite; color: var(--lopez-green); font-weight: 400; }
+    .streaming-bubble { border: 1px solid #e5e7eb; }
+
+    /* Stream error row */
+    .stream-error-row {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      max-width: 800px;
+      margin: 0 auto 1rem;
+      padding: 0.625rem 1rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 0.75rem;
+      color: #b91c1c;
+      font-size: 0.8125rem;
+    }
+    .btn-retry {
+      margin-left: auto;
+      background: white;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      border-radius: 6px;
+      padding: 0.25rem 0.625rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .btn-retry:hover { background: #fee2e2; }
+
     .input-area {
       padding: 1rem 1.5rem;
       border-top: 1px solid var(--border);
@@ -429,8 +502,12 @@ export class ChatComponent implements OnInit {
   guestMessages = signal<Array<{ role: 'user' | 'assistant'; content: string; aiModel?: string }>>([]);
   loadingConvs = signal(false);
   generating = signal(false);
+  isStreaming = signal(false);
+  streamingContent = signal('');
+  streamError = signal('');
   newMessage = '';
   selectedModel = 'gemini-2.5-flash';
+  private lastSentContent = '';
 
   availableModels = computed(() => AI_MODELS);
 
@@ -514,13 +591,15 @@ export class ChatComponent implements OnInit {
   }
 
   async sendMessage() {
-    if (!this.newMessage.trim() || this.generating()) return;
+    if (!this.newMessage.trim() || this.generating() || this.isStreaming()) return;
     const content = this.newMessage.trim();
     this.newMessage = '';
-    this.generating.set(true);
+    this.lastSentContent = content;
+    this.streamError.set('');
 
     if (!this.auth.isAuthenticated()) {
       this.guestMessages.update(m => [...m, { role: 'user', content }]);
+      this.generating.set(true);
       try {
         const res = await this.api.freeChat(content, this.selectedModel);
         this.guestMessages.update(m => [...m, { role: 'assistant', content: res.response, aiModel: this.selectedModel }]);
@@ -542,7 +621,6 @@ export class ChatComponent implements OnInit {
         convId = conv.id;
       } catch {
         this.toast.error('Fehler', 'Konversation konnte nicht erstellt werden');
-        this.generating.set(false);
         return;
       }
     }
@@ -554,16 +632,37 @@ export class ChatComponent implements OnInit {
       content
     }]);
 
+    this.generating.set(true);
+    this.scrollToBottom();
+
     try {
-      await this.api.sendMessage(convId!, content, this.selectedModel);
+      this.streamingContent.set('');
+      await this.api.streamChat(convId!, content, this.selectedModel, (token) => {
+        if (this.generating()) {
+          this.generating.set(false);
+          this.isStreaming.set(true);
+        }
+        this.streamingContent.update(c => c + token);
+        this.scrollToBottom();
+      });
+
       const msgs = await this.api.getMessages(convId!);
       this.messages.set(msgs);
     } catch (err: any) {
-      this.toast.error('Fehler', err?.message || 'Nachricht konnte nicht gesendet werden');
+      this.streamError.set(err?.message || 'Verbindung unterbrochen. Bitte versuche es erneut.');
     } finally {
       this.generating.set(false);
+      this.isStreaming.set(false);
+      this.streamingContent.set('');
       this.scrollToBottom();
     }
+  }
+
+  async retryLastMessage() {
+    if (!this.lastSentContent) return;
+    this.streamError.set('');
+    this.newMessage = this.lastSentContent;
+    await this.sendMessage();
   }
 
   canUseModel(tier: string): boolean {

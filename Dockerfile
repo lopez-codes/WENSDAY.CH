@@ -1,13 +1,13 @@
 # wensday.ch – Production Docker (Angular + Express)
 # Optimiert für Google Cloud Run
 
-FROM node:20-alpine AS base
+FROM node:26-alpine AS base
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci --only=production
 
 # ── Build Stage ───────────────────────────────────────────────────────────────
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
@@ -25,7 +25,7 @@ RUN npx esbuild server/index.ts \
     --format=esm --outdir=dist
 
 # ── Production Stage ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS production
+FROM node:26-alpine AS production
 
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S wensday -u 1001

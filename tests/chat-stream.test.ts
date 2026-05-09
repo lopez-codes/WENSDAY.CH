@@ -1,294 +1,193 @@
 // Chat SSE Streaming Tests – wensday.ch
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// Tests real imported logic from shared modules; no fabricated local helpers.
+import { describe, it, expect } from 'vitest';
+import { AI_PROVIDERS } from '../shared/ai-providers';
+import {
+  USER_ROLES,
+  hasPermission,
+  canAccessProvider,
+  getMaxDailyMessages,
+} from '../shared/permissions';
 import { testUtils } from './setup';
 
-// ── SSE frame parser (mirrors ApiService.streamChat logic) ────────────────────
-function parseSSEFrames(raw: string): Array<Record<string, unknown>> {
-  const events: Array<Record<string, unknown>> = [];
-  const lines = raw.split('\n');
-  for (const line of lines) {
-    if (!line.startsWith('data: ')) continue;
-    try { events.push(JSON.parse(line.slice(6))); } catch { /* skip malformed */ }
-  }
-  return events;
-}
+// ── AI_PROVIDERS – streaming capability ──────────────────────────────────────
 
-// ── Model allowlist (mirrors routes.ts) ───────────────────────────────────────
-const ALLOWED_MODELS: Record<string, string[]> = {
-  free:  ['gemini-2.5-flash', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'gpt-4o-mini'],
-  ultra: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o'],
-  pro:   ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o', 'gpt-5'],
-  wensday_core: ['gemini-2.5-flash', 'gemini-2.5-pro', 'google/gemini-2.0-flash:free', 'deepseek/deepseek-r1:free', 'deepseek-chat', 'gpt-4o-mini', 'gpt-4o', 'gpt-5'],
-};
-
-function selectModel(requested: string | undefined, tier: string): string {
-  const allowed = ALLOWED_MODELS[tier] || ALLOWED_MODELS.free;
-  return requested && allowed.includes(requested) ? requested : 'gemini-2.5-flash';
-}
-
-// ── Provider routing logic (mirrors stream route) ─────────────────────────────
-function resolveStreamingProvider(model: string, env: Record<string, string | undefined>) {
-  if (model.startsWith('gemini-') && env.GEMINI_API_KEY)   return 'gemini';
-  if (model.startsWith('gpt')    && env.OPENAI_API_KEY)    return 'openai';
-  if (model.startsWith('deepseek-') && env.DEEPSEEK_API_KEY) return 'deepseek';
-  if ((model.includes('/') || model.includes(':')) && env.OPENROUTER_API_KEY) return 'openrouter';
-  return 'fallback';
-}
-
-// ── Simulate SSE stream output ─────────────────────────────────────────────────
-function buildSSEStream(events: Array<Record<string, unknown>>): string {
-  return events.map(e => `data: ${JSON.stringify(e)}`).join('\n') + '\n';
-}
-
-// ── Tests ─────────────────────────────────────────────────────────────────────
-
-describe('SSE Frame Parser', () => {
-  it('parses token events', () => {
-    const raw = buildSSEStream([{ token: 'Hallo' }, { token: ' Welt' }, { done: true, messageId: 'msg1', model: 'gemini-2.5-flash' }]);
-    const events = parseSSEFrames(raw);
-    expect(events).toHaveLength(3);
-    expect(events[0]).toEqual({ token: 'Hallo' });
-    expect(events[1]).toEqual({ token: ' Welt' });
-    expect(events[2]).toMatchObject({ done: true, messageId: 'msg1' });
+describe('Streaming-fähige AI-Provider', () => {
+  it('Gemini unterstützt natives Streaming', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'gemini');
+    expect(p?.features?.streaming).toBe(true);
   });
 
-  it('parses ackUserPersisted event', () => {
-    const raw = buildSSEStream([{ ackUserPersisted: true }, { token: 'Antwort' }, { done: true, messageId: 'msg2', model: 'gpt-4o' }]);
-    const events = parseSSEFrames(raw);
-    expect(events[0]).toEqual({ ackUserPersisted: true });
-    expect(events[1].token).toBe('Antwort');
+  it('OpenAI unterstützt natives Streaming', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'openai');
+    expect(p?.features?.streaming).toBe(true);
   });
 
-  it('parses error event', () => {
-    const raw = buildSSEStream([{ ackUserPersisted: true }, { error: 'Provider-Fehler' }]);
-    const events = parseSSEFrames(raw);
-    expect(events[1]).toEqual({ error: 'Provider-Fehler' });
+  it('DeepSeek unterstützt natives Streaming', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'deepseek');
+    expect(p?.features?.streaming).toBe(true);
   });
 
-  it('skips malformed SSE lines gracefully', () => {
-    const raw = 'data: {"token":"ok"}\ndata: {BROKEN\ndata: {"done":true,"messageId":"m","model":"g"}\n';
-    const events = parseSSEFrames(raw);
-    expect(events).toHaveLength(2);
-    expect(events[0].token).toBe('ok');
-    expect(events[1].done).toBe(true);
+  it('OpenRouter unterstützt Streaming', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'openrouter');
+    expect(p?.features?.streaming).toBe(true);
   });
 
-  it('ignores non-data lines', () => {
-    const raw = 'event: message\nid: 1\ndata: {"token":"hi"}\n\n';
-    const events = parseSSEFrames(raw);
-    expect(events).toHaveLength(1);
-    expect(events[0].token).toBe('hi');
+  it('alle 4 Haupt-Provider unterstützen Streaming', () => {
+    const slugs = ['gemini', 'openai', 'deepseek', 'openrouter'];
+    for (const slug of slugs) {
+      const p = AI_PROVIDERS.find(p => p.slug === slug);
+      expect(p?.features?.streaming, `${slug} soll streaming=true haben`).toBe(true);
+    }
   });
 });
 
-describe('SSE Stream – Event Ordering', () => {
-  it('ackUserPersisted appears before first token', () => {
-    const events = [
-      { ackUserPersisted: true },
-      { token: 'Erstes' },
-      { token: ' Wort' },
-      { done: true, messageId: 'id1', model: 'gemini-2.5-flash' },
-    ];
-    const ackIdx = events.findIndex(e => 'ackUserPersisted' in e);
-    const tokenIdx = events.findIndex(e => 'token' in e);
-    expect(ackIdx).toBeLessThan(tokenIdx);
+describe('Provider-Modell-IDs für Stream-Routing', () => {
+  it('Gemini-Modelle beginnen mit "gemini-"', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'gemini')!;
+    for (const m of p.supportedModels) {
+      expect(m.id).toMatch(/^gemini-/);
+    }
   });
 
-  it('done event is the last event in a successful stream', () => {
-    const events = [
-      { ackUserPersisted: true },
-      { token: 'Text' },
-      { done: true, messageId: 'id2', model: 'gpt-4o-mini' },
-    ];
-    const last = events[events.length - 1];
-    expect(last).toMatchObject({ done: true });
+  it('OpenAI-Modelle beginnen mit "gpt" oder "o" (o3-mini, o1-mini)', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'openai')!;
+    for (const m of p.supportedModels) {
+      expect(m.id).toMatch(/^(gpt|o\d)/);
+    }
   });
 
-  it('error event terminates stream without done', () => {
-    const events = [
-      { ackUserPersisted: true },
-      { error: 'Provider offline' },
-    ];
-    const hasDone = events.some(e => 'done' in e);
-    const hasError = events.some(e => 'error' in e);
-    expect(hasDone).toBe(false);
-    expect(hasError).toBe(true);
+  it('DeepSeek-Modelle beginnen mit "deepseek-"', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'deepseek')!;
+    for (const m of p.supportedModels) {
+      expect(m.id).toMatch(/^deepseek-/);
+    }
+  });
+
+  it('OpenRouter-Modelle enthalten "/" (Anbieter-Präfix)', () => {
+    const p = AI_PROVIDERS.find(p => p.slug === 'openrouter')!;
+    for (const m of p.supportedModels) {
+      expect(m.id).toContain('/');
+    }
   });
 });
 
-describe('Client Disconnect – no persistence', () => {
-  it('clientGone=true prevents assistant message persistence', () => {
-    let messagesPersisted = 0;
-    let quotaCharged = 0;
-    let completedNormally = false;
+// ── Tier-Limits (via real hasPermission / getMaxDailyMessages) ────────────────
 
-    // Simulate streaming loop that aborts on clientGone
-    const tokens = ['Hallo', ' Welt', '!'];
-    let clientGone = false;
-
-    const streamedTokens: string[] = [];
-    for (const token of tokens) {
-      if (clientGone) break;
-      streamedTokens.push(token);
-      if (streamedTokens.length === 2) clientGone = true; // disconnect after 2 tokens
-    }
-
-    if (!clientGone) completedNormally = true;
-
-    if (completedNormally && streamedTokens.join('').trim()) {
-      messagesPersisted++;
-      quotaCharged++;
-    }
-
-    expect(streamedTokens).toHaveLength(2);
-    expect(completedNormally).toBe(false);
-    expect(messagesPersisted).toBe(0);
-    expect(quotaCharged).toBe(0);
+describe('Tier-Limits für Streaming-Quota', () => {
+  it('Free-Nutzer: 10 Nachrichten/Tag', () => {
+    expect(getMaxDailyMessages('free')).toBe(10);
   });
 
-  it('normal completion persists message and charges quota', () => {
-    let messagesPersisted = 0;
-    let quotaCharged = 0;
-    let completedNormally = false;
-
-    const tokens = ['Hallo', ' Welt', '!'];
-    const clientGone = false;
-    let fullContent = '';
-
-    for (const token of tokens) {
-      if (clientGone) break;
-      fullContent += token;
-    }
-    if (!clientGone) completedNormally = true;
-
-    if (completedNormally && fullContent.trim()) {
-      messagesPersisted++;
-      quotaCharged++;
-    }
-
-    expect(completedNormally).toBe(true);
-    expect(messagesPersisted).toBe(1);
-    expect(quotaCharged).toBe(1);
+  it('Ultra-Nutzer: 500 Nachrichten/Tag', () => {
+    expect(getMaxDailyMessages('ultra')).toBe(500);
   });
 
-  it('empty content does not get persisted even after normal completion', () => {
-    let messagesPersisted = 0;
-    const completedNormally = true;
-    const fullContent = '';
+  it('Pro-Nutzer: unbegrenzt (-1)', () => {
+    expect(getMaxDailyMessages('pro')).toBe(-1);
+  });
 
-    if (completedNormally && fullContent.trim()) {
-      messagesPersisted++;
-    }
+  it('wensday_core: unbegrenzt (-1)', () => {
+    expect(getMaxDailyMessages('wensday_core')).toBe(-1);
+  });
 
-    expect(messagesPersisted).toBe(0);
+  it('Unbekanntes Tier → 0 (blockiert)', () => {
+    expect(getMaxDailyMessages('unknown')).toBe(0);
   });
 });
 
-describe('Retry – skipUserMessage semantics', () => {
-  it('userPersisted=false (pre-stream failure) → retry sends user message again', () => {
-    const userPersisted = false; // e.g. rate limit error before ack
-    const skipUserMessage = userPersisted;
-    expect(skipUserMessage).toBe(false);
+describe('Streaming-Berechtigung via hasPermission', () => {
+  it('Free-Nutzer darf basic chat nutzen', () => {
+    expect(hasPermission('free', 'user.chat.basic')).toBe(true);
   });
 
-  it('userPersisted=true (post-ack failure) → retry skips user message', () => {
-    const userPersisted = true; // ack received, stream failed mid-way
-    const skipUserMessage = userPersisted;
-    expect(skipUserMessage).toBe(true);
+  it('Free-Nutzer darf KEINEN advanced chat nutzen', () => {
+    expect(hasPermission('free', 'user.chat.advanced')).toBe(false);
   });
 
-  it('retryContext preserves original conversationId and model', () => {
-    const failedCtx = { conversationId: 'conv-abc', model: 'gemini-2.5-flash', userPersisted: true };
-    // Even if user navigates away and changes model, retry uses frozen context
-    const currentModel = 'gpt-5'; // user changed model after failure
-    expect(failedCtx.model).not.toBe(currentModel);
-    expect(failedCtx.conversationId).toBe('conv-abc');
+  it('Ultra-Nutzer darf advanced chat und Provider-Auswahl', () => {
+    expect(hasPermission('ultra', 'user.chat.advanced')).toBe(true);
+    expect(hasPermission('ultra', 'user.providers.select')).toBe(true);
+  });
+
+  it('Pro-Nutzer hat alle Nutzer-Berechtigungen', () => {
+    expect(hasPermission('pro', 'user.chat.advanced')).toBe(true);
+    expect(hasPermission('pro', 'user.providers.select')).toBe(true);
+    expect(hasPermission('pro', 'user.export.conversations')).toBe(true);
+  });
+
+  it('wensday_core hat API-Zugang', () => {
+    expect(hasPermission('wensday_core', 'core.api.access')).toBe(true);
+    expect(hasPermission('wensday_core', 'core.providers.unlimited')).toBe(true);
   });
 });
 
-describe('Model Routing – Provider Selection', () => {
-  const fullEnv = {
-    GEMINI_API_KEY: 'key', OPENAI_API_KEY: 'key',
-    DEEPSEEK_API_KEY: 'key', OPENROUTER_API_KEY: 'key',
+describe('Provider-Zugang via canAccessProvider', () => {
+  it('Free-Nutzer darf nur Google (Gemini) nutzen', () => {
+    expect(canAccessProvider('free', 'google')).toBe(true);
+    expect(canAccessProvider('free', 'openai')).toBe(false);
+    expect(canAccessProvider('free', 'deepseek')).toBe(false);
+  });
+
+  it('Ultra-Nutzer darf Google, OpenAI und Anthropic', () => {
+    expect(canAccessProvider('ultra', 'google')).toBe(true);
+    expect(canAccessProvider('ultra', 'openai')).toBe(true);
+    expect(canAccessProvider('ultra', 'anthropic')).toBe(true);
+  });
+
+  it('wensday_core hat Zugang zu allen Providern (*)', () => {
+    expect(USER_ROLES['wensday_core'].canAccessProviders).toContain('*');
+  });
+});
+
+// ── Rate-limit logic (as used in /api/chat/stream) ───────────────────────────
+
+describe('Rate-Limit-Guard (Stream-Endpoint-Logik)', () => {
+  const isRateLimited = (tier: string, count: number): boolean => {
+    const limit = getMaxDailyMessages(tier);
+    return limit > 0 && count >= limit;
   };
 
-  it('gemini-2.5-flash → gemini provider', () => {
-    expect(resolveStreamingProvider('gemini-2.5-flash', fullEnv)).toBe('gemini');
+  it('Free mit 9 Nachrichten: nicht blockiert', () => {
+    expect(isRateLimited('free', 9)).toBe(false);
   });
 
-  it('gemini-2.5-pro → gemini provider', () => {
-    expect(resolveStreamingProvider('gemini-2.5-pro', fullEnv)).toBe('gemini');
+  it('Free mit 10 Nachrichten: blockiert', () => {
+    expect(isRateLimited('free', 10)).toBe(true);
   });
 
-  it('gpt-4o → openai provider', () => {
-    expect(resolveStreamingProvider('gpt-4o', fullEnv)).toBe('openai');
+  it('Ultra mit 499 Nachrichten: nicht blockiert', () => {
+    expect(isRateLimited('ultra', 499)).toBe(false);
   });
 
-  it('gpt-5 → openai provider', () => {
-    expect(resolveStreamingProvider('gpt-5', fullEnv)).toBe('openai');
+  it('Ultra mit 500 Nachrichten: blockiert', () => {
+    expect(isRateLimited('ultra', 500)).toBe(true);
   });
 
-  it('deepseek-chat → deepseek provider', () => {
-    expect(resolveStreamingProvider('deepseek-chat', fullEnv)).toBe('deepseek');
-  });
-
-  it('google/gemini-2.0-flash:free → openrouter provider', () => {
-    expect(resolveStreamingProvider('google/gemini-2.0-flash:free', fullEnv)).toBe('openrouter');
-  });
-
-  it('deepseek/deepseek-r1:free → openrouter provider', () => {
-    expect(resolveStreamingProvider('deepseek/deepseek-r1:free', fullEnv)).toBe('openrouter');
-  });
-
-  it('missing API key forces fallback', () => {
-    expect(resolveStreamingProvider('gemini-2.5-flash', {})).toBe('fallback');
-    expect(resolveStreamingProvider('gpt-4o', {})).toBe('fallback');
-    expect(resolveStreamingProvider('deepseek-chat', {})).toBe('fallback');
-    expect(resolveStreamingProvider('google/gemini-2.0-flash:free', {})).toBe('fallback');
+  it('Pro mit 9999 Nachrichten: nicht blockiert (unlimited)', () => {
+    expect(isRateLimited('pro', 9999)).toBe(false);
   });
 });
 
-describe('Model Allowlist per Tier', () => {
-  it('Free-Tier darf nur 4 Modelle nutzen', () => {
-    expect(ALLOWED_MODELS.free).toHaveLength(4);
-    expect(ALLOWED_MODELS.free).toContain('gemini-2.5-flash');
-    expect(ALLOWED_MODELS.free).not.toContain('gpt-5');
-    expect(ALLOWED_MODELS.free).not.toContain('deepseek-chat');
-  });
+// ── Test-Utilities für Chat-Stream-Szenarien ──────────────────────────────────
 
-  it('Pro-Tier enthält alle Modelle inkl. gpt-5', () => {
-    expect(ALLOWED_MODELS.pro).toContain('gpt-5');
-    expect(ALLOWED_MODELS.pro).toContain('deepseek-chat');
-  });
-
-  it('Unbekanntes Modell → Fallback auf gemini-2.5-flash', () => {
-    expect(selectModel('unknown-model-xyz', 'free')).toBe('gemini-2.5-flash');
-    expect(selectModel(undefined, 'pro')).toBe('gemini-2.5-flash');
-  });
-
-  it('Free-User kann kein Ultra-Only Modell nutzen', () => {
-    const model = selectModel('gpt-4o', 'free');
-    expect(model).toBe('gemini-2.5-flash'); // rejected, falls back to default
-  });
-
-  it('Ultra-User kann gpt-4o nutzen', () => {
-    expect(selectModel('gpt-4o', 'ultra')).toBe('gpt-4o');
-  });
-
-  it('Pro-User kann gpt-5 nutzen', () => {
-    expect(selectModel('gpt-5', 'pro')).toBe('gpt-5');
-  });
-});
-
-describe('Test Utilities', () => {
-  it('createTestUser erstellt gültigen User für Stream-Tests', () => {
+describe('Test Utilities – Chat Stream Szenarien', () => {
+  it('createTestUser mit Ultra-Tier für Streaming-Tests', () => {
     const user = testUtils.createTestUser({ subscriptionTier: 'ultra' });
     expect(user.subscriptionTier).toBe('ultra');
     expect(user.dailyMessageCount).toBe(0);
+    expect(getMaxDailyMessages('ultra')).toBeGreaterThan(10);
   });
 
-  it('createTestConversation erstellt Konversation mit korrekter userId', () => {
-    const conv = testUtils.createTestConversation('user_stream_test');
-    expect(conv.userId).toBe('user_stream_test');
+  it('createTestConversation mit korrekter userId', () => {
+    const conv = testUtils.createTestConversation('user_stream_42');
+    expect(conv.userId).toBe('user_stream_42');
+    expect(conv.id).toMatch(/^test_conv_/);
+  });
+
+  it('createTestMessage erstellt User-Nachricht', () => {
+    const msg = testUtils.createTestMessage('conv_stream_1');
+    expect(msg.role).toBe('user');
+    expect(msg.conversationId).toBe('conv_stream_1');
   });
 });

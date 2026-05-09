@@ -595,15 +595,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         if (!clientGone) completedNormally = true;
       } else {
-        // Last-resort fallback: non-streaming provider (e.g. HuggingFace, unconfigured providers)
-        // This path is only reached for providers without streaming APIs or missing API keys.
-        const response = await aiProviderManager.generateResponse(selectedModel, history, { systemPrompt, maxTokens: 4096, temperature: 0.7 });
-        fullContent = response;
-        if (!clientGone) {
-          // Emit as single block – no fake delay, explicit degraded mode
-          sendSSE({ token: fullContent });
-          completedNormally = true;
-        }
+        // No native streaming path for this model/configuration.
+        // Emit explicit error rather than degraded non-streaming block.
+        const missing = selectedModel.startsWith('gemini-') ? 'GEMINI_API_KEY'
+          : selectedModel.startsWith('gpt')        ? 'OPENAI_API_KEY'
+          : selectedModel.startsWith('deepseek-')  ? 'DEEPSEEK_API_KEY'
+          : 'OPENROUTER_API_KEY';
+        sendSSE({ error: `Kein Streaming-Provider für ${selectedModel} konfiguriert (${missing} fehlt).` });
       }
 
       // Only persist assistant message and charge quota when stream completed fully.

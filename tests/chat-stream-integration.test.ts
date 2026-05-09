@@ -151,13 +151,14 @@ async function streamHandler(
     }
     sendSSE({ ackUserPersisted: true });
 
-    // Quota charged at generation start (mirrors routes.ts fix for early-disconnect protection)
-    await storageMock.incrementDailyMessageCount(userId);
-
     if (aiError) {
+      // No quota charged when provider configuration fails (mirrors routes.ts else-branch)
       sendSSE({ error: aiError });
       return res.end();
     }
+
+    // Charge quota after provider is confirmed (mirrors routes.ts: only when provider configured)
+    await storageMock.incrementDailyMessageCount(userId);
 
     let fullContent = '';
     for (const t of aiTokens) {
@@ -355,12 +356,12 @@ describe('POST /api/chat/stream – Quota bei Stream-Start (Early-Disconnect-Sch
     expect(storageMock.incrementDailyMessageCount).toHaveBeenCalledWith('user_free');
   });
 
-  it('Quota auch bei AI-Fehler (Early-Disconnect) abgebucht', async () => {
+  it('Quota NICHT abgebucht wenn AI-Config fehlt (else-Branch)', async () => {
     const req = buildMockReq({ userId: 'user_ultra', body: { content: 'Hi', conversationId: 'conv_ultra', model: 'gemini-2.5-flash' } });
     const res = buildMockRes();
+    // aiError simuliert fehlende Provider-Config (kein API-Key)
     await streamHandler(req, res, [], 'AI kaputt');
-    // Quota muss VOR dem AI-Fehler abgebucht worden sein
-    expect(storageMock.incrementDailyMessageCount).toHaveBeenCalledWith('user_ultra');
+    expect(storageMock.incrementDailyMessageCount).not.toHaveBeenCalled();
   });
 
   it('Quota NICHT abgebucht wenn Rate-Limit überschritten', async () => {

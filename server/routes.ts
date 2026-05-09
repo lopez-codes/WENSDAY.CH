@@ -439,6 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders();
 
     let clientGone = false;
@@ -475,9 +476,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Immediately signal that user message is persisted – client uses this for safe retry
       sendSSE({ ackUserPersisted: true });
-
-      // Charge quota at generation start, not completion, to prevent abuse via early-disconnect.
-      await storage.incrementDailyMessageCount(userId);
 
       const allMessages = await storage.getConversationMessages(conversationId);
       const history = allMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
@@ -547,6 +545,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { role: 'system' as const, content: systemPrompt },
         ...history.map(m => ({ role: m.role, content: m.content })),
       ];
+
+      // Charge quota once a valid provider is confirmed – after provider handshake detection
+      // but before streaming starts. This guards early-disconnect abuse while not penalising
+      // missing API-key configuration errors (else branch below does NOT charge).
+      if (isNativeGemini || isNativeOpenAI || isDeepSeek || isOpenRouter) {
+        await storage.incrementDailyMessageCount(userId);
+      }
 
       if (isNativeGemini) {
         const { GoogleGenAI } = await import('@google/genai');

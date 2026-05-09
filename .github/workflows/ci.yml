@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── TypeScript & Angular Build Check ──────────────────────────────────
+  build-check:
+    name: Build Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check (backend)
+        run: npx tsc --noEmit
+
+      - name: Angular build
+        run: |
+          cd angular-client
+          node ../node_modules/@angular/cli/bin/ng.js build --configuration production
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Express backend build
+        run: |
+          npx esbuild server/index.ts \
+            --platform=node \
+            --packages=external \
+            --bundle \
+            --format=esm \
+            --outdir=dist
+
+  # ── Docker Build Test (kein Push) ─────────────────────────────────────
+  docker-build:
+    name: Docker Build Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build-check
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image (test only)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: wensday-ch:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

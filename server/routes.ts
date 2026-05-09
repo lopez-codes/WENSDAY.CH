@@ -36,6 +36,11 @@ const RATE_LIMITS = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint (used by Docker, Cloud Run, CI/CD)
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString(), version: process.env.npm_package_version || "1.0.0" });
+  });
+
   // Auth middleware
   await setupAuth(app);
 

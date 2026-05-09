@@ -1,0 +1,118 @@
+name: CD – Deploy to Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy target'
+        required: true
+        default: 'production'
+        type: choice
+        options: [production, staging]
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGION: europe-west6
+  SERVICE: wensday-ch
+  REGISTRY: europe-west6-docker.pkg.dev
+
+jobs:
+  # ── Deploy Production ──────────────────────────────────────────────────
+  deploy:
+    name: Deploy → ${{ inputs.environment || 'production' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    environment:
+      name: ${{ inputs.environment || 'production' }}
+      url: https://wensday.ch
+
+    permissions:
+      contents: read
+      id-token: write   # Workload Identity Federation (keyless)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Keyless Auth via Workload Identity Federation ──────────────────
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGISTRY }} --quiet
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Image bauen & pushen ───────────────────────────────────────────
+      - name: Build & push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: true
+          sbom: true
+
+      # ── Auf Cloud Run deployen (Zürich) ───────────────────────────────
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE }}
+          region: ${{ env.REGION }}
+          image: ${{ env.REGISTRY }}/${{ secrets.GCP_PROJECT_ID }}/${{ env.SERVICE }}/${{ env.SERVICE }}:${{ github.sha }}
+          flags: |
+            --allow-unauthenticated
+            --port=8080
+            --memory=512Mi
+            --cpu=1
+            --min-instances=0
+            --max-instances=10
+            --concurrency=80
+            --timeout=60
+          secrets: |
+            DATABASE_URL=DATABASE_URL:latest
+            OPENAI_API_KEY=OPENAI_API_KEY:latest
+            GEMINI_API_KEY=GEMINI_API_KEY:latest
+            STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest
+            STRIPE_WEBHOOK_SECRET=STRIPE_WEBHOOK_SECRET:latest
+            SESSION_SECRET=SESSION_SECRET:latest
+          env_vars: |
+            NODE_ENV=production
+            ALLOWED_ORIGINS=https://lopez-codes.github.io
+
+      # ── Health Check nach Deploy ───────────────────────────────────────
+      - name: Health check
+        run: |
+          echo "Service URL: ${{ steps.deploy.outputs.url }}"
+          sleep 10
+          curl -sf "${{ steps.deploy.outputs.url }}/api/health" \
+            || (echo "Health check failed!" && exit 1)
+
+      # ── Deploy Summary ─────────────────────────────────────────────────
+      - name: Deploy summary
+        run: |
+          echo "## Deploy erfolgreich 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "| Key | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| **URL** | ${{ steps.deploy.outputs.url }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Region** | ${{ env.REGION }} (Zürich) |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit** | ${{ github.event.head_commit.message }} |" >> $GITHUB_STEP_SUMMARY

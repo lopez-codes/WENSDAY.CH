@@ -659,10 +659,43 @@ export class ChatComponent implements OnInit {
   }
 
   async retryLastMessage() {
-    if (!this.lastSentContent) return;
+    const content = this.lastSentContent;
+    const convId = this.selectedId();
+    if (!content || !convId) return;
+
     this.streamError.set('');
-    this.newMessage = this.lastSentContent;
-    await this.sendMessage();
+
+    // Reload messages from DB – restores clean state without optimistic duplicate
+    try {
+      const msgs = await this.api.getMessages(convId);
+      this.messages.set(msgs);
+    } catch { /* proceed anyway */ }
+
+    this.generating.set(true);
+    this.scrollToBottom();
+
+    try {
+      this.streamingContent.set('');
+      // skipUserMessage=true: user message is already persisted from the failed attempt
+      await this.api.streamChat(convId, content, this.selectedModel, (token) => {
+        if (this.generating()) {
+          this.generating.set(false);
+          this.isStreaming.set(true);
+        }
+        this.streamingContent.update(c => c + token);
+        this.scrollToBottom();
+      }, true);
+
+      const msgs = await this.api.getMessages(convId);
+      this.messages.set(msgs);
+    } catch (err: any) {
+      this.streamError.set(err?.message || 'Verbindung unterbrochen. Bitte versuche es erneut.');
+    } finally {
+      this.generating.set(false);
+      this.isStreaming.set(false);
+      this.streamingContent.set('');
+      this.scrollToBottom();
+    }
   }
 
   canUseModel(tier: string): boolean {

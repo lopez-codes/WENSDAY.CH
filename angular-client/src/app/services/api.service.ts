@@ -57,13 +57,14 @@ export class ApiService {
     conversationId: string,
     content: string,
     model: string,
-    onToken: (token: string) => void
+    onToken: (token: string) => void,
+    skipUserMessage = false
   ): Promise<{ messageId: string; model: string }> {
     const response = await fetch('/api/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ conversationId, content, model }),
+      body: JSON.stringify({ conversationId, content, model, skipUserMessage }),
     });
 
     if (!response.ok) {

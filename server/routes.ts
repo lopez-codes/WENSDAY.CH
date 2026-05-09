@@ -461,7 +461,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.end();
       }
 
-      const { content, conversationId, model: requestedModel } = req.body;
+      const { content, conversationId, model: requestedModel, skipUserMessage = false } = req.body;
       if (!content || typeof content !== 'string') { sendSSE({ error: 'Nachricht fehlt' }); return res.end(); }
 
       const conversation = await storage.getConversation(conversationId);
@@ -469,7 +469,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sendSSE({ error: 'Konversation nicht gefunden' }); return res.end();
       }
 
-      await storage.createMessage({ conversationId, role: 'user', content });
+      // skipUserMessage=true on retry: user message already persisted from failed attempt
+      if (!skipUserMessage) {
+        await storage.createMessage({ conversationId, role: 'user', content });
+      }
 
       const allMessages = await storage.getConversationMessages(conversationId);
       const history = allMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));

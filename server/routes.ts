@@ -490,6 +490,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const systemPrompt = `Sie sind ein professioneller KI-Assistent für wensday.ch, eine Schweizer Business-AI-Plattform. Antworten Sie präzise, hilfreich und geschäftsorientiert auf Deutsch. Branche: ${user.industry || 'Allgemein'}, Unternehmensgröße: ${user.companySize || 'KMU'}`;
 
       let fullContent = '';
+      let completedNormally = false; // set to true only after provider finishes cleanly
 
       // Helper: parse OpenAI-compatible SSE stream (DeepSeek, OpenRouter)
       const streamOpenAICompat = async (
@@ -556,6 +557,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const token = chunk.text;
           if (token) { fullContent += token; sendSSE({ token }); }
         }
+        if (!clientGone) completedNormally = true;
       } else if (isNativeOpenAI) {
         const { default: OpenAI } = await import('openai');
         const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -571,12 +573,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const token = chunk.choices[0]?.delta?.content || '';
           if (token) { fullContent += token; sendSSE({ token }); }
         }
+        if (!clientGone) completedNormally = true;
       } else if (isDeepSeek) {
         await streamOpenAICompat(
           'https://api.deepseek.com/chat/completions',
           { Authorization: `Bearer ${process.env.DEEPSEEK_API_KEY}` },
           { model: selectedModel, messages: chatMessages, max_tokens: 4096, temperature: 0.7 }
         );
+        if (!clientGone) completedNormally = true;
       } else if (isOpenRouter) {
         await streamOpenAICompat(
           'https://openrouter.ai/api/v1/chat/completions',
@@ -587,22 +591,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
           { model: selectedModel, messages: chatMessages, max_tokens: 4096, temperature: 0.7 }
         );
+        if (!clientGone) completedNormally = true;
       } else {
         // Last-resort fallback: non-streaming provider (e.g. HuggingFace, unconfigured providers)
         // This path is only reached for providers without streaming APIs or missing API keys.
         const response = await aiProviderManager.generateResponse(selectedModel, history, { systemPrompt, maxTokens: 4096, temperature: 0.7 });
         fullContent = response;
-        // Emit as single block – no fake delay, explicit degraded mode
-        sendSSE({ token: fullContent });
+        if (!clientGone) {
+          // Emit as single block – no fake delay, explicit degraded mode
+          sendSSE({ token: fullContent });
+          completedNormally = true;
+        }
       }
 
-      const aiMessage = await storage.createMessage({
-        conversationId, role: 'assistant', content: fullContent, aiModel: selectedModel,
-        hasErrors: false, errorDetails: null, confidenceScore: 85,
-        businessCategory: user.industry || 'general', needsReview: false, factChecked: true, sources: []
-      });
-      await storage.incrementDailyMessageCount(userId);
-      sendSSE({ done: true, messageId: aiMessage.id, model: selectedModel });
+      // Only persist assistant message and charge quota when stream completed fully.
+      // If client disconnected mid-stream, discard partial content to avoid garbage entries.
+      if (completedNormally && fullContent.trim()) {
+        const aiMessage = await storage.createMessage({
+          conversationId, role: 'assistant', content: fullContent, aiModel: selectedModel,
+          hasErrors: false, errorDetails: null, confidenceScore: 85,
+          businessCategory: user.industry || 'general', needsReview: false, factChecked: true, sources: []
+        });
+        await storage.incrementDailyMessageCount(userId);
+        sendSSE({ done: true, messageId: aiMessage.id, model: selectedModel });
+      }
     } catch (error: any) {
       console.error('SSE stream error:', error);
       sendSSE({ error: error.message || 'Streaming-Fehler' });

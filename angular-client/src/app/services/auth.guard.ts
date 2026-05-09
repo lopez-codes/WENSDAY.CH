@@ -19,6 +19,21 @@ export const authGuard: CanActivateFn = () => {
   );
 };
 
+export const adminGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  const router = inject(Router);
+
+  return toObservable(auth.isLoading).pipe(
+    filter(loading => !loading),
+    take(1),
+    map(() => {
+      if (auth.isAuthenticated() && auth.user()?.isAdmin) return true;
+      router.navigate(['/']);
+      return false;
+    })
+  );
+};
+
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);

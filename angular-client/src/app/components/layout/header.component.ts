@@ -44,7 +44,9 @@ import { APP_CONFIG } from '../../config/app.config';
                 @if (userMenuOpen()) {
                   <div class="dropdown">
                     @if (auth.user()?.isAdmin) {
-                      <a href="/admin" class="dropdown-item">Admin</a>
+                      <a routerLink="/admin" class="dropdown-item" (click)="userMenuOpen.set(false)">
+                        ⚙ Admin Panel
+                      </a>
                     }
                     <a routerLink="/settings" class="dropdown-item" (click)="userMenuOpen.set(false)">Einstellungen</a>
                     <button class="dropdown-item" (click)="auth.logout()">Abmelden</button>

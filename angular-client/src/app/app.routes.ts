@@ -1,5 +1,5 @@
 import { Routes } from '@angular/router';
-import { authGuard, guestGuard } from './services/auth.guard';
+import { authGuard, adminGuard, guestGuard } from './services/auth.guard';
 
 export const routes: Routes = [
   {
@@ -27,6 +27,11 @@ export const routes: Routes = [
   {
     path: 'subscribe',
     loadComponent: () => import('./pages/subscribe/subscribe.component').then(m => m.SubscribeComponent),
+  },
+  {
+    path: 'admin',
+    loadComponent: () => import('./pages/admin/admin.component').then(m => m.AdminComponent),
+    canActivate: [adminGuard]
   },
   {
     path: 'settings',

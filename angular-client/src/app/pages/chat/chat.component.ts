@@ -177,11 +177,11 @@ const AI_MODELS = [
                 [(ngModel)]="newMessage"
                 (keydown.enter)="sendMessage()"
                 placeholder="Nachricht eingeben..."
-                [disabled]="generating()"
+                [disabled]="generating() || isStreaming()"
               />
               <button class="btn btn-primary send-btn"
                       (click)="sendMessage()"
-                      [disabled]="!newMessage.trim() || generating()">
+                      [disabled]="!newMessage.trim() || generating() || isStreaming()">
                 ➤
               </button>
             </div>

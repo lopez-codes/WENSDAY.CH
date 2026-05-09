@@ -482,7 +482,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let fullContent = '';
 
-      const isGemini = selectedModel.startsWith('gemini') || selectedModel.includes('gemini');
+      // Only native Gemini model IDs (e.g. "gemini-2.5-flash") use Google SDK streaming.
+      // OpenRouter-style IDs like "google/gemini-2.0-flash:free" go through provider fallback.
+      const isGemini = selectedModel.startsWith('gemini-');
       const isOpenAI = selectedModel.startsWith('gpt');
 
       if (isGemini && process.env.GEMINI_API_KEY) {

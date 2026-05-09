@@ -34,6 +34,10 @@ export const routes: Routes = [
     canActivate: [authGuard]
   },
   {
+    path: 'opensource',
+    loadComponent: () => import('./pages/opensource/opensource.component').then(m => m.OpensourceComponent),
+  },
+  {
     path: 'about',
     loadComponent: () => import('./pages/about/about.component').then(m => m.AboutComponent),
   },

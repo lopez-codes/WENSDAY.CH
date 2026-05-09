@@ -33,6 +33,7 @@ import { APP_CONFIG } from '../../config/app.config';
             <ul>
               <li><a routerLink="/about">Über uns</a></li>
               <li><a routerLink="/contact">Kontakt</a></li>
+              <li><a routerLink="/opensource">Open Source</a></li>
             </ul>
           </div>
 

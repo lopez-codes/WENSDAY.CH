@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { HeaderComponent } from '../../components/layout/header.component';
 import { FooterComponent } from '../../components/layout/footer.component';
+import { APP_CONFIG } from '../../config/app.config';
 
 @Component({
   selector: 'app-about',
@@ -16,18 +17,18 @@ import { FooterComponent } from '../../components/layout/footer.component';
 
       <div class="about-grid">
         <div class="card">
-          <h2>🏢 Lopez Codes</h2>
-          <p>Einzelunternehmen mit Sitz in Münsingen, Kanton Bern. Spezialisiert auf KI-Forschung, maschinelles Lernen und Cloud Computing.</p>
+          <h2>🏢 {{ cfg.companyName }}</h2>
+          <p>{{ cfg.companyType }} mit Sitz in {{ cfg.companyCity }}, Kanton Bern. Spezialisiert auf KI-Forschung, maschinelles Lernen und Cloud Computing.</p>
           <ul>
-            <li><strong>UID:</strong> CHE-316.025.450</li>
-            <li><strong>Adresse:</strong> Tägertschistrasse 5, 3110 Münsingen</li>
-            <li><strong>Gründung:</strong> September 2024</li>
+            <li><strong>UID:</strong> {{ cfg.companyUid }}</li>
+            <li><strong>Adresse:</strong> {{ cfg.companyStreet }}, {{ cfg.companyZip }} {{ cfg.companyCity }}</li>
+            <li><strong>Gründung:</strong> {{ cfg.founded }}</li>
           </ul>
         </div>
 
         <div class="card">
           <h2>🎯 Mission</h2>
-          <p>Wir machen professionelle KI-Tools für Schweizer KMU und Unternehmen zugänglich – mit Fokus auf Datenschutz, Qualität und Zuverlässigkeit.</p>
+          <p>{{ cfg.mission }}</p>
         </div>
 
         <div class="card">
@@ -53,4 +54,6 @@ import { FooterComponent } from '../../components/layout/footer.component';
     .card li strong { color: var(--foreground); }
   `]
 })
-export class AboutComponent {}
+export class AboutComponent {
+  cfg = APP_CONFIG;
+}

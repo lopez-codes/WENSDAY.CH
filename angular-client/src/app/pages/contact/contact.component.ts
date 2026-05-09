@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HeaderComponent } from '../../components/layout/header.component';
 import { FooterComponent } from '../../components/layout/footer.component';
+import { APP_CONFIG } from '../../config/app.config';
 
 @Component({
   selector: 'app-contact',
@@ -44,8 +45,9 @@ import { FooterComponent } from '../../components/layout/footer.component';
       <div class="card" style="margin-top:1.5rem">
         <h3 style="font-weight:600;margin-bottom:0.75rem">Direkt kontaktieren</h3>
         <p style="font-size:0.875rem;color:var(--swiss-gray)">
-          📍 Tägertschistrasse 5, 3110 Münsingen, Schweiz<br>
-          🏢 Lopez Codes · CHE-316.025.450
+          📍 {{ cfg.companyStreet }}, {{ cfg.companyZip }} {{ cfg.companyCity }}, {{ cfg.companyCountry }}<br>
+          🏢 {{ cfg.companyName }} · {{ cfg.companyUid }}<br>
+          ✉️ <a [href]="'mailto:' + cfg.contactEmail" style="color:var(--lopez-green)">{{ cfg.contactEmail }}</a>
         </p>
       </div>
     </div>
@@ -58,6 +60,7 @@ import { FooterComponent } from '../../components/layout/footer.component';
   `]
 })
 export class ContactComponent {
+  cfg = APP_CONFIG;
   sent = signal(false);
   form = { name: '', email: '', message: '' };
 

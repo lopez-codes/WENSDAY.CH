@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { APP_CONFIG } from '../../config/app.config';
 
 @Component({
   selector: 'app-footer',
@@ -11,13 +12,11 @@ import { RouterLink } from '@angular/router';
         <div class="footer-grid">
           <div class="footer-brand">
             <div class="footer-logo">
-              <div class="logo-icon">W</div>
-              <span>wensday.ch</span>
+              <div class="logo-icon">{{ cfg.logoLetter }}</div>
+              <span>{{ cfg.appName }}</span>
             </div>
-            <p class="footer-desc">
-              Swiss AI chat platform for professional research and independent analysis.
-            </p>
-            <p class="footer-powered">Powered by <span>lopez.codes</span></p>
+            <p class="footer-desc">{{ cfg.description }}</p>
+            <p class="footer-powered">{{ cfg.appTagline }}</p>
           </div>
 
           <div class="footer-col">
@@ -47,7 +46,7 @@ import { RouterLink } from '@angular/router';
         </div>
 
         <div class="footer-bottom">
-          <p>© 2025 wensday.ch · Lopez Codes, CHE-316.025.450 · Münsingen, Switzerland 🇨🇭</p>
+          <p>© 2025 {{ cfg.appName }} · {{ cfg.companyName }}, {{ cfg.companyUid }} · {{ cfg.companyCity }}, {{ cfg.companyCountry }} 🇨🇭</p>
         </div>
       </div>
     </footer>
@@ -122,4 +121,6 @@ import { RouterLink } from '@angular/router';
     }
   `]
 })
-export class FooterComponent {}
+export class FooterComponent {
+  cfg = APP_CONFIG;
+}

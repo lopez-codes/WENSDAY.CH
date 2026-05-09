@@ -2,6 +2,7 @@ import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
+import { APP_CONFIG } from '../../config/app.config';
 
 @Component({
   selector: 'app-header',
@@ -12,10 +13,10 @@ import { AuthService } from '../../services/auth.service';
       <div class="container">
         <div class="header-inner">
           <a routerLink="/" class="header-logo">
-            <div class="logo-icon">W</div>
+            <div class="logo-icon">{{ cfg.logoLetter }}</div>
             <span class="logo-text">
-              wensday.ch
-              <span class="logo-sub">Powered by lopez.codes</span>
+              {{ cfg.appName }}
+              <span class="logo-sub">{{ cfg.appTagline }}</span>
             </span>
           </a>
 
@@ -216,6 +217,7 @@ import { AuthService } from '../../services/auth.service';
 })
 export class HeaderComponent {
   auth = inject(AuthService);
+  cfg = APP_CONFIG;
   mobileOpen = signal(false);
   userMenuOpen = signal(false);
 

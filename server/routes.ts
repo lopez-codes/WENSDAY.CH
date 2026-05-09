@@ -476,6 +476,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Immediately signal that user message is persisted – client uses this for safe retry
       sendSSE({ ackUserPersisted: true });
 
+      // Charge quota at generation start, not completion, to prevent abuse via early-disconnect.
+      await storage.incrementDailyMessageCount(userId);
+
       const allMessages = await storage.getConversationMessages(conversationId);
       const history = allMessages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
@@ -604,15 +607,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sendSSE({ error: `Kein Streaming-Provider für ${selectedModel} konfiguriert (${missing} fehlt).` });
       }
 
-      // Only persist assistant message and charge quota when stream completed fully.
-      // If client disconnected mid-stream, discard partial content to avoid garbage entries.
+      // Persist assistant message only when stream completed cleanly.
+      // Quota was already incremented at generation start (above) to prevent early-disconnect abuse.
       if (completedNormally && fullContent.trim()) {
         const aiMessage = await storage.createMessage({
           conversationId, role: 'assistant', content: fullContent, aiModel: selectedModel,
           hasErrors: false, errorDetails: null, confidenceScore: 85,
           businessCategory: user.industry || 'general', needsReview: false, factChecked: true, sources: []
         });
-        await storage.incrementDailyMessageCount(userId);
         sendSSE({ done: true, messageId: aiMessage.id, model: selectedModel });
       }
     } catch (error: any) {

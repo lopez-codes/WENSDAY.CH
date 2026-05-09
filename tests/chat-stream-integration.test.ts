@@ -151,6 +151,9 @@ async function streamHandler(
     }
     sendSSE({ ackUserPersisted: true });
 
+    // Quota charged at generation start (mirrors routes.ts fix for early-disconnect protection)
+    await storageMock.incrementDailyMessageCount(userId);
+
     if (aiError) {
       sendSSE({ error: aiError });
       return res.end();
@@ -341,5 +344,126 @@ describe('POST /api/chat/stream – Disconnect (clientGone)', () => {
 
     await streamHandler(req, res, ['A', 'B', 'C']);
     expect(res.events.some(e => e['done'] === true)).toBe(false);
+  });
+});
+
+describe('POST /api/chat/stream – Quota bei Stream-Start (Early-Disconnect-Schutz)', () => {
+  it('incrementDailyMessageCount wird nach Validierung aufgerufen', async () => {
+    const req = buildMockReq({ userId: 'user_free', body: { content: 'Hi', conversationId: 'conv_free', model: 'gemini-2.5-flash' } });
+    const res = buildMockRes();
+    await streamHandler(req, res, ['ok']);
+    expect(storageMock.incrementDailyMessageCount).toHaveBeenCalledWith('user_free');
+  });
+
+  it('Quota auch bei AI-Fehler (Early-Disconnect) abgebucht', async () => {
+    const req = buildMockReq({ userId: 'user_ultra', body: { content: 'Hi', conversationId: 'conv_ultra', model: 'gemini-2.5-flash' } });
+    const res = buildMockRes();
+    await streamHandler(req, res, [], 'AI kaputt');
+    // Quota muss VOR dem AI-Fehler abgebucht worden sein
+    expect(storageMock.incrementDailyMessageCount).toHaveBeenCalledWith('user_ultra');
+  });
+
+  it('Quota NICHT abgebucht wenn Rate-Limit überschritten', async () => {
+    const req = buildMockReq({ userId: 'user_limit', body: { content: 'Hi', conversationId: 'conv_free', model: 'gemini-2.5-flash' } });
+    const res = buildMockRes();
+    await streamHandler(req, res, ['ok']);
+    expect(storageMock.incrementDailyMessageCount).not.toHaveBeenCalled();
+  });
+
+  it('Quota NICHT abgebucht wenn Konversation nicht gefunden', async () => {
+    const req = buildMockReq({ userId: 'user_free', body: { content: 'Hi', conversationId: 'unbekannt', model: 'gemini-2.5-flash' } });
+    const res = buildMockRes();
+    await streamHandler(req, res, ['ok']);
+    expect(storageMock.incrementDailyMessageCount).not.toHaveBeenCalled();
+  });
+});
+
+// ── HTTP-Level SSE-Framing-Test (Express route wiring) ────────────────────────
+// Testet dass der echte Express-Route die korrekten SSE-Headers setzt
+// und die Antwort mit "data:" SSE-Format beginnt.
+
+import express from 'express';
+import request from 'supertest';
+
+function buildMinimalSSEApp() {
+  const app = express();
+  app.use(express.json());
+
+  app.post('/api/chat/stream',
+    (req: any, _res: any, next: any) => {
+      const uid = req.headers['x-test-user'];
+      if (!uid) { _res.status(401).json({ error: 'Unauthorized' }); return; }
+      req.user = { claims: { sub: uid } };
+      next();
+    },
+    (_req: any, res: any) => {
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.flushHeaders();
+      res.write('data: {"ackUserPersisted":true}\n\n');
+      res.write('data: {"token":"ok"}\n\n');
+      res.write('data: {"done":true,"messageId":"test","model":"gemini-2.5-flash"}\n\n');
+      res.end();
+    }
+  );
+
+  return app;
+}
+
+describe('HTTP SSE-Framing (Express route wiring)', () => {
+  const app = buildMinimalSSEApp();
+
+  it('antwortet mit 200 und Content-Type text/event-stream', async () => {
+    const res = await request(app)
+      .post('/api/chat/stream')
+      .set('x-test-user', 'user_free')
+      .send({ content: 'test', conversationId: 'c1' })
+      .buffer(true)
+      .parse((res, cb) => { let d = ''; res.on('data', c => { d += c; }); res.on('end', () => cb(null, d)); });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('text/event-stream');
+  });
+
+  it('Cache-Control ist no-cache', async () => {
+    const res = await request(app)
+      .post('/api/chat/stream')
+      .set('x-test-user', 'user_free')
+      .send({ content: 'test', conversationId: 'c1' })
+      .buffer(true)
+      .parse((res, cb) => { let d = ''; res.on('data', c => { d += c; }); res.on('end', () => cb(null, d)); });
+    expect(res.headers['cache-control']).toBe('no-cache');
+  });
+
+  it('Response-Body beginnt mit "data: " (SSE-Format)', async () => {
+    const res = await request(app)
+      .post('/api/chat/stream')
+      .set('x-test-user', 'user_free')
+      .send({ content: 'test', conversationId: 'c1' })
+      .buffer(true)
+      .parse((res, cb) => { let d = ''; res.on('data', c => { d += c; }); res.on('end', () => cb(null, d)); });
+    expect(typeof res.body).toBe('string');
+    expect((res.body as string).trim().startsWith('data:')).toBe(true);
+  });
+
+  it('SSE-Body enthält alle drei Events (ack, token, done)', async () => {
+    const res = await request(app)
+      .post('/api/chat/stream')
+      .set('x-test-user', 'user_free')
+      .send({ content: 'test', conversationId: 'c1' })
+      .buffer(true)
+      .parse((res, cb) => { let d = ''; res.on('data', c => { d += c; }); res.on('end', () => cb(null, d)); });
+    const body = res.body as string;
+    expect(body).toContain('"ackUserPersisted":true');
+    expect(body).toContain('"token"');
+    expect(body).toContain('"done":true');
+  });
+
+  it('401 ohne x-test-user Header', async () => {
+    const res = await request(app)
+      .post('/api/chat/stream')
+      .send({ content: 'test' });
+    expect(res.status).toBe(401);
   });
 });

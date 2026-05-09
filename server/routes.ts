@@ -441,7 +441,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders();
 
-    const sendSSE = (data: object) => res.write(`data: ${JSON.stringify(data)}\n\n`);
+    let clientGone = false;
+    req.on('close', () => { clientGone = true; });
+
+    const sendSSE = (data: object) => {
+      if (clientGone) return;
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
 
     try {
       const userId = req.user.claims.sub;

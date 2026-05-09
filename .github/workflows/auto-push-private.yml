@@ -1,0 +1,21 @@
+name: Auto-Push → Private Repo
+
+# Jeder Commit auf main wird automatisch zur privaten Repo gespiegelt
+on:
+  push:
+    branches: [main]
+
+jobs:
+  mirror:
+    name: Mirror → blopen/WENSDAY-private
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push zu privater Repo
+        run: |
+          git push "https://blopen:${{ secrets.PRIVATE_REPO_TOKEN }}@github.com/blopen/WENSDAY-private.git" main:main
+          echo "✅ main → blopen/WENSDAY-private gespiegelt"

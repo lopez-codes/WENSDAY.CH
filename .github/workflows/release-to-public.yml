@@ -1,0 +1,51 @@
+name: Release to Public Repo
+
+# Manuell auslösen – Lopez entscheidet, was open-source wird
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: 'Release-Notiz (was wird open-source?)'
+        required: true
+        type: string
+      branch:
+        description: 'Quell-Branch (Standard: production)'
+        required: false
+        default: 'production'
+        type: string
+
+jobs:
+  release:
+    name: Release → lopez-codes/WENSDAY.CH
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout privater Repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+          fetch-depth: 0
+
+      - name: Push zu Public Repo
+        run: |
+          git config user.name  "Lopez Codes"
+          git config user.email "nelson@lopez.codes"
+
+          # Öffentliches Repo als Remote hinzufügen
+          git remote add public "https://lopez-codes:${{ secrets.PUBLIC_REPO_TOKEN }}@github.com/lopez-codes/WENSDAY.CH.git" || true
+
+          # Auf main des public repo pushen
+          git push public ${{ inputs.branch }}:main --force-with-lease
+
+          echo "✅ Gepusht: '${{ inputs.branch }}' → lopez-codes/WENSDAY.CH main"
+
+      - name: Summary
+        run: |
+          echo "## 🚀 Open-Source Release" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Release-Notiz:** ${{ inputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Quell-Branch:** \`${{ inputs.branch }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Ziel:** [lopez-codes/WENSDAY.CH](https://github.com/lopez-codes/WENSDAY.CH)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Commit: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
